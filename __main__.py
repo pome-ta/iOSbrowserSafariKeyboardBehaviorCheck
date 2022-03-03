@@ -16,12 +16,13 @@ class View(ui.View):
     ui.View.__init__(self, *args, **kwargs)
     self.wv = WKWebView()
     self.wv.load_url(str(uri))
-    self.wv.flex = 'WH'
+    
     self.refresh_webview()
-
     self.add_subview(self.wv)
+    
     self.set_close_btn()
     self.set_reload_btn()
+    self.wv.flex = 'WH'
 
   def layout(self):
     _x, _y, _w, _h = self.frame
@@ -56,8 +57,8 @@ if __name__ == '__main__':
   present_themed(
     view,
     theme_name='Theme09_Editorial',
-    style='fullscreen',
-    #style='panel',
+    #style='fullscreen',
+    style='panel',
     hide_title_bar=True,
     orientations=['portrait'])
 
