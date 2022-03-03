@@ -8,7 +8,7 @@ from editor import present_themed
 sys.path.append(str(pathlib.Path.cwd()) + '/pythonista-webview')
 from wkwebview import WKWebView
 
-uri = pathlib.Path('./public/index.html')
+uri = pathlib.Path('./docs/index.html')
 
 
 class View(ui.View):
