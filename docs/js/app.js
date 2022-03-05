@@ -1,6 +1,6 @@
 "use strict"
 
-console.log('hoge');
+//console.log(visualViewport.height);
 function viewportHandler(event) {
   document.documentElement.style.setProperty(
       '--visualViewport-height',
@@ -19,3 +19,14 @@ function viewportHandler(event) {
 
 document.addEventListener('DOMContentLoaded', viewportHandler);
 visualViewport.addEventListener('resize', viewportHandler);
+
+
+
+
+document.addEventListener('DOMContentLoaded', function() {
+  const canvas = document.getElementById('mainCanvas');
+  const ctx = canvas.getContext('2d');
+  console.log(canvas);
+});
+
+
