@@ -23,10 +23,10 @@ visualViewport.addEventListener('resize', viewportHandler);
 
 
 
-document.addEventListener('DOMContentLoaded', function() {
-  const canvas = document.getElementById('mainCanvas');
-  const ctx = canvas.getContext('2d');
-  console.log(canvas);
-});
+
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+console.log(canvas);
+
 
 
