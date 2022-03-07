@@ -23,15 +23,15 @@ canvas {
   height:100%;
 }
 
-
+.wrapper {
+  display: grid;
+}
 
 .wp {
   height: var(--visualViewport-height);
 }
 
 input {
-  /*width: fit-content;*/
-  /*display: inline-block;*/
   width: 100%;
   
 }
