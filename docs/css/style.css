@@ -28,10 +28,6 @@ canvas {
   height:100%;
 }
 
-.wrapper {
-  display: grid;
-}
-
 .wp {
   height: var(--visualViewport-height);
 }
@@ -41,5 +37,25 @@ input {
   
 }
 
+.wrapper {
+  display: grid;
+  /*height: var(--visualViewport-height);*/
+}
+
+.canvasWrapper {
+  /*position: fixed;*/
+  /*position: absolute;*/
+  top: 0;
+  z-index: -1;
+}
+
+.contentsWrapper {
+  width: 100%;
+  /*opacity: 0.5;*/
+  /*position: fixed;*/
+  position: absolute;
+  /*position: sticky;*/
+  bottom: 0;
+}
 
 
