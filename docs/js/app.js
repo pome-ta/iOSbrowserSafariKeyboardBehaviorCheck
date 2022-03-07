@@ -13,9 +13,16 @@ function viewportHandler(event) {
       '--visualViewport-height',
       `${visualViewport.height}px`
     );
+    
+  const log_text = `visualViewport.height: ${visualViewport.height}
+  VisualViewport.offsetTop: ${VisualViewport.offsetTop}
+  window.outerHeight: ${window.outerHeight}
+  window.innerHeight: ${window.innerHeight}
+  `;
   const targets = document.querySelectorAll('.log');
   for (const target of targets) {
-    target.innerHTML = visualViewport.height;
+    //target.innerHTML = log_text;
+    target.innerText = log_text;
   }
 }
 
