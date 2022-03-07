@@ -8,18 +8,15 @@ document.addEventListener('DOMContentLoaded', loadcanvas);
 
 
 
-//console.log(visualViewport.height);
 function viewportHandler(event) {
   document.documentElement.style.setProperty(
       '--visualViewport-height',
       `${visualViewport.height}px`
     );
-  
   const targets = document.querySelectorAll('.log');
   for (const target of targets) {
     target.innerHTML = visualViewport.height;
   }
-  
 }
 
 
