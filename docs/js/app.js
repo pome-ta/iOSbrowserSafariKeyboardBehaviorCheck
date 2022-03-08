@@ -10,10 +10,13 @@ document.addEventListener('DOMContentLoaded', loadcanvas);
 
 function viewportHandler(event) {
   let offsetTop;
+  let wrapper_height;
   const body_height = document.body.clientHeight;
   const window_height = window.innerHeight;
   if (body_height > window_height) {
     offsetTop = body_height + window_height;
+  } else {
+    offsetTop = 0;
   }
   document.documentElement.style.setProperty(
       '--visualViewport-height',
@@ -26,6 +29,8 @@ function viewportHandler(event) {
   window.innerHeight: ${window.innerHeight}
   document.body: ${document.body.clientHeight}
   document.documentElement: ${document.documentElement.clientHeight}
+  offsetTop: ${offsetTop};
+  
   `;
   const targets = document.querySelectorAll('.log');
   for (const target of targets) {

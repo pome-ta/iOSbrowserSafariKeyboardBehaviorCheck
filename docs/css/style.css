@@ -5,6 +5,7 @@
 :root {
   --visualViewport-height: 100vh;
   --offset-height: 0;
+  --wrapper-height: 0;
 }
 
 
@@ -41,7 +42,7 @@ input {
 .wrapper {
   display: grid;
   /*height: var(--visualViewport-height);*/
-  height:200%;
+  /*height:100%;*/
 }
 
 .canvasWrapper {
@@ -49,7 +50,7 @@ input {
   /*position: absolute;*/
   /*position: relative;*/
   position: sticky;
-  top: var(--offset-height);;
+  top: var(--offset-height);
   z-index: -1;
 }
 
