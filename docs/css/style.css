@@ -4,7 +4,7 @@
 
 :root {
   --visualViewport-height: 100vh;
-  --offset-height: 0;
+  --offset-top: 0;
   --wrapper-height: 0;
 }
 
@@ -19,12 +19,12 @@
 
 html {
   width: 100%;
-  height:100%;
+  /*height:100%;*/
 }
 body {
   margin: 0;
-  width:100%;
-  height: 100%;
+  /*width:100%;*/
+  /*height: 100%;*/
 }
 
 canvas {
@@ -52,7 +52,7 @@ input {
   /*position: absolute;*/
   /*position: relative;*/
   position: sticky;
-  top: var(--offset-height);
+  top: var(--offset-top);
   /*top: var(--visualViewport-height);*/
   z-index: -1;
 }
@@ -67,5 +67,4 @@ input {
   bottom: 0;
   z-index: 1;
 }
-
-
+ 

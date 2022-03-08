@@ -26,25 +26,58 @@ function viewportHandler() {
   } else {
     offsetTop = 0;
   }
+  
+  /*
+  const visualViewport_height = visualViewport.height;
+  const window_innerHeight = window.innerHeight;
+  const window_pageYOffset = window.pageYOffset;
+  
+  if (visualViewport_height === window_innerHeight) {
+    offsetTop = 0;
+  } else {
+    //offsetTop = window_pageYOffset;
+    offsetTop = 0;
+  }
+  */
+  
+  
+  const canvasWrapper = document.querySelector('.canvasWrapper');
+  const canvasWrapper_top = canvasWrapper.getBoundingClientRect().top
+  
+  if (0 < canvasWrapper_top) {
+    offsetTop = 0;
+  } else {
+    offsetTop = -(canvasWrapper_top);
+  }
+  
+  
+  
   document.documentElement.style.setProperty(
       '--visualViewport-height',
       `${visualViewport.height}px`
+    );
+  document.documentElement.style.setProperty(
+      '--offset-top',
+      `${offsetTop}px`
     );
   
   const wrapper = document.querySelector('.wrapper');
   const relativePositionTop = wrapper.getBoundingClientRect().top;
   const relativePositionBottom = wrapper.getBoundingClientRect().bottom - window.innerHeight;
   
+  
+  
   const cli = wrapper.getBoundingClientRect();
   const log_text = `visualViewport.height: ${visualViewport.height}
   window.innerHeight: ${window.innerHeight}
   document.body: ${document.body.clientHeight}
   window.pageYOffset: ${window.pageYOffset}
+  offsetTop: ${offsetTop}
   relativePositionTop: ${relativePositionTop}
   relativePositionBottom: ${relativePositionBottom}
+  canvasWrapper_top: ${canvasWrapper_top}
   
-  window.outerHeight: ${window.outerHeight}
-  document.documentElement: ${document.documentElement.clientHeight}
+  
   
   `;
   const targets = document.querySelectorAll('.log');
