@@ -4,11 +4,19 @@
 document.addEventListener('DOMContentLoaded', viewportHandler);
 visualViewport.addEventListener('resize', viewportHandler);
 
+window.addEventListener('scroll', viewportHandler);
+
 document.addEventListener('DOMContentLoaded', loadcanvas);
+/*
+draw();
+  function draw() {
+    requestAnimationFrame(draw);
+    viewportHandler();
+    loadcanvas();
+}
+*/
 
-
-
-function viewportHandler(event) {
+function viewportHandler() {
   let offsetTop;
   let wrapper_height;
   const body_height = document.body.clientHeight;
@@ -22,15 +30,21 @@ function viewportHandler(event) {
       '--visualViewport-height',
       `${visualViewport.height}px`
     );
-    
+  
+  const wrapper = document.querySelector('.wrapper');
+  const relativePositionTop = wrapper.getBoundingClientRect().top;
+  const relativePositionBottom = wrapper.getBoundingClientRect().bottom - window.innerHeight;
+  
+  const cli = wrapper.getBoundingClientRect();
   const log_text = `visualViewport.height: ${visualViewport.height}
   window.innerHeight: ${window.innerHeight}
   document.body: ${document.body.clientHeight}
-  offsetTop: ${offsetTop}
+  window.pageYOffset: ${window.pageYOffset}
+  relativePositionTop: ${relativePositionTop}
+  relativePositionBottom: ${relativePositionBottom}
   
   window.outerHeight: ${window.outerHeight}
   document.documentElement: ${document.documentElement.clientHeight}
-  
   
   `;
   const targets = document.querySelectorAll('.log');
@@ -43,10 +57,10 @@ function viewportHandler(event) {
 
 
 
-let myCanvas;
+//let myCanvas;
 
 function loadcanvas() {
-  myCanvas = document.querySelector('#mainCanvas');
+  let myCanvas = document.querySelector('#mainCanvas');
   //const { clientWidth : w , clientHeight : h } =  myCanvas;
   const {width : w, height : h} =  myCanvas;
   const ctx = myCanvas.getContext('2d');
