@@ -24,12 +24,13 @@ function viewportHandler(event) {
     );
     
   const log_text = `visualViewport.height: ${visualViewport.height}
-  VisualViewport.offsetTop: ${VisualViewport.offsetTop}
-  window.outerHeight: ${window.outerHeight}
   window.innerHeight: ${window.innerHeight}
   document.body: ${document.body.clientHeight}
+  offsetTop: ${offsetTop}
+  
+  window.outerHeight: ${window.outerHeight}
   document.documentElement: ${document.documentElement.clientHeight}
-  offsetTop: ${offsetTop};
+  
   
   `;
   const targets = document.querySelectorAll('.log');
