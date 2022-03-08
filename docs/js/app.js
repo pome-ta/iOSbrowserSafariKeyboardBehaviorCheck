@@ -65,6 +65,9 @@ function viewportHandler() {
   const relativePositionTop = wrapper.getBoundingClientRect().top;
   const relativePositionBottom = wrapper.getBoundingClientRect().bottom - window.innerHeight;
   
+  const body_ele = document.querySelector('body');
+  //console.log(body_ele);
+  
   
   
   const cli = wrapper.getBoundingClientRect();
@@ -76,7 +79,6 @@ function viewportHandler() {
   relativePositionTop: ${relativePositionTop}
   relativePositionBottom: ${relativePositionBottom}
   canvasWrapper_top: ${canvasWrapper_top}
-  
   
   
   `;
