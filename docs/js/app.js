@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', loadcanvas);
 
 
 function viewportHandler(event) {
+  let offsetTop;
+  const body_height = document.body.clientHeight;
+  const window_height = window.innerHeight;
+  if (body_height > window_height) {
+    offsetTop = body_height + window_height;
+  }
   document.documentElement.style.setProperty(
       '--visualViewport-height',
       `${visualViewport.height}px`
@@ -18,6 +24,8 @@ function viewportHandler(event) {
   VisualViewport.offsetTop: ${VisualViewport.offsetTop}
   window.outerHeight: ${window.outerHeight}
   window.innerHeight: ${window.innerHeight}
+  document.body: ${document.body.clientHeight}
+  document.documentElement: ${document.documentElement.clientHeight}
   `;
   const targets = document.querySelectorAll('.log');
   for (const target of targets) {
