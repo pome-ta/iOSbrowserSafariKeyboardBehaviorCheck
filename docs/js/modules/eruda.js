@@ -1,3 +1,12 @@
+// https://www.skypack.dev/view/eruda
+
+/**
+<script type="module">
+  import eruda from 'https://cdn.skypack.dev/eruda';
+</script>
+ */
+
+
 function getDefaultExportFromCjs(x) {
   return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
 }
