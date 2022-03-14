@@ -42,7 +42,7 @@ function viewportHandler() {
   
   
   const canvasWrapper = document.querySelector('.canvasWrapper');
-  const canvasWrapper_top = canvasWrapper.getBoundingClientRect().top
+  const canvasWrapper_top = canvasWrapper.getBoundingClientRect().top;
   
   if (0 < canvasWrapper_top) {
     offsetTop = 0;
