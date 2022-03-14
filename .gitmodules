@@ -1,3 +1,6 @@
 [submodule "pythonista-webview"]
 	path = pythonista-webview
 	url = https://pome-ta@github.com/pome-ta/pythonista-webview
+[submodule "docs/js/eruda"]
+	path = docs/js/eruda
+	url = git@github.com:pome-ta/eruda.git
