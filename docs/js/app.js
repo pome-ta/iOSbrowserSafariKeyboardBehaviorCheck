@@ -1,15 +1,20 @@
 //import { EditorView, basicSetup } from 'https://cdn.skypack.dev/codemirror';
 
-import {EditorState} from 'https://cdn.skypack.dev/@codemirror/state';
-import {EditorView} from 'https://cdn.skypack.dev/@codemirror/view';
-import {lineNumbers} from 'https://cdn.skypack.dev/@codemirror/gutter';
+import { EditorState } from 'https://cdn.skypack.dev/@codemirror/state';
+import { EditorView, keymap } from 'https://cdn.skypack.dev/@codemirror/view';
+import { defaultKeymap } from 'https://cdn.skypack.dev/@codemirror/commands';
+import { lineNumbers } from 'https://cdn.skypack.dev/@codemirror/gutter';
+
+console.log(EditorState);
 
 let startState = EditorState.create({
-  doc: "Hello World",
-  //extensions: [lineNumbers()]
-})
+  doc: 'Hello World',
+  extensions: [keymap.of(defaultKeymap)],
+});
 
-let view = new EditorView({
-  state: startState,
-  parent: document.body,
+document.addEventListener('DOMContentLoaded', () => {
+  let view = new EditorView({
+    state: startState,
+    parent: document.body,
+  });
 });
