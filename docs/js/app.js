@@ -9,6 +9,8 @@ import {
   highlightActiveLineGutter,
 } from 'https://esm.sh/@codemirror/view';
 
+import { oneDark } from 'https://esm.sh/@codemirror/theme-one-dark';
+
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
 editorDiv.style.width = '100%';
@@ -42,10 +44,6 @@ let view = new EditorView({
 });
 */
 
-let lineWrapping = true;
-
-const lineWrappingComp = new Compartment();
-
 const editorView = new EditorView({
   state: EditorState.create({
     doc: defaultValue,
@@ -53,11 +51,10 @@ const editorView = new EditorView({
       lineNumbers(),
       highlightActiveLine(),
       highlightActiveLineGutter(),
-      lineWrappingComp.of(lineWrapping ? EditorView.lineWrapping : []),
+      EditorView.lineWrapping,
+      // oneDark,
     ],
   }),
   //parent: document.body,
   parent: document.querySelector('#editorWrap'),
 });
-
-console.log(editorView);
