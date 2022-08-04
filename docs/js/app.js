@@ -35,6 +35,7 @@ let view = new EditorView({
   //parent: document.body,
   parent: document.querySelector('#editorWrap'),
 });
+<<<<<<< Updated upstream
 */
 
 const editorView = new EditorView({
@@ -46,3 +47,7 @@ const editorView = new EditorView({
   parent: document.body,
 });
 
+=======
+
+console.log(view);
+>>>>>>> Stashed changes
