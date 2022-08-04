@@ -1,7 +1,7 @@
 //import { EditorView, basicSetup } from 'https://esm.sh/codemirror';
 //import { javascript } from 'https://esm.sh/@codemirror/lang-javascript';
 
-import { EditorState } from 'https://esm.sh/@codemirror/state';
+import { EditorState, Compartment } from 'https://esm.sh/@codemirror/state';
 import {
   EditorView,
   lineNumbers,
@@ -12,6 +12,7 @@ import {
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
 editorDiv.style.width = '100%';
+//editorDiv.style.whiteSpace = 'nowrap'
 document.body.appendChild(editorDiv);
 
 const defaultValue = `📝 2022/07/23
@@ -41,6 +42,10 @@ let view = new EditorView({
 });
 */
 
+let lineWrapping = true;
+
+const lineWrappingComp = new Compartment();
+
 const editorView = new EditorView({
   state: EditorState.create({
     doc: defaultValue,
@@ -48,10 +53,11 @@ const editorView = new EditorView({
       lineNumbers(),
       highlightActiveLine(),
       highlightActiveLineGutter(),
+      lineWrappingComp.of(lineWrapping ? EditorView.lineWrapping : []),
     ],
   }),
-  //parent: editorParentRef.current,
-  parent: document.body,
+  //parent: document.body,
+  parent: document.querySelector('#editorWrap'),
 });
 
 console.log(editorView);
