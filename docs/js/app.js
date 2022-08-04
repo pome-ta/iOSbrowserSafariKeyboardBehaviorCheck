@@ -2,8 +2,12 @@
 //import { javascript } from 'https://esm.sh/@codemirror/lang-javascript';
 
 import { EditorState } from 'https://esm.sh/@codemirror/state';
-import { EditorView, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from 'https://esm.sh/@codemirror/view';
-
+import {
+  EditorView,
+  lineNumbers,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+} from 'https://esm.sh/@codemirror/view';
 
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
@@ -35,19 +39,19 @@ let view = new EditorView({
   //parent: document.body,
   parent: document.querySelector('#editorWrap'),
 });
-<<<<<<< Updated upstream
 */
 
 const editorView = new EditorView({
   state: EditorState.create({
     doc: defaultValue,
-    extensions: [lineNumbers(), highlightActiveLine(), highlightActiveLineGutter()],
+    extensions: [
+      lineNumbers(),
+      highlightActiveLine(),
+      highlightActiveLineGutter(),
+    ],
   }),
   //parent: editorParentRef.current,
   parent: document.body,
 });
 
-=======
-
-console.log(view);
->>>>>>> Stashed changes
+console.log(editorView);
