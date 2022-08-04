@@ -1,14 +1,14 @@
 @charset "utf-8";
 @import url("./styleChecker.css");
 
-
-:root {
-  --visualViewport-height: 100vh;
-  --offset-top: 0;
-  --wrapper-height: 0;
+html {
+  height: 100%;
+  /* タップアクション制御 */
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
-
-
 
 *,
 *::before,
@@ -16,55 +16,8 @@
   box-sizing: border-box;
 }
 
-
-html {
-  width: 100%;
-  /*height:100%;*/
-}
 body {
-  margin: 0;
-  /*width:100%;*/
-  /*height: 100vh;*/
+  max-width: 960px;
+  margin: auto;
 }
 
-canvas {
-  width:100%;
-  height:100%;
-}
-
-.wp {
-  height: var(--visualViewport-height);
-}
-
-input {
-  width: 100%;
-  
-}
-
-.wrapper {
-  display: grid;
-  /*height: var(--visualViewport-height);*/
-  /*height:100%;*/
-}
-
-.canvasWrapper {
-  /*position: fixed;*/
-  /*position: absolute;*/
-  /*position: relative;*/
-  position: sticky;
-  top: var(--offset-top);
-  /*top: var(--visualViewport-height);*/
-  /*z-index: -1;*/
-}
-
-.contentsWrapper {
-  width: 100%;
-  /*opacity: 0.5;*/
-  /*position: fixed;*/
-  /*position: absolute;*/
-  /*position: relative;*/
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-}
- 
