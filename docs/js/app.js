@@ -1,15 +1,15 @@
-//import { EditorView, basicSetup } from 'https://esm.sh/codemirror';
-//import { javascript } from 'https://esm.sh/@codemirror/lang-javascript';
+//import { basicSetup } from 'codemirror';
+//import { javascript } from '@codemirror/lang-javascript';
 
-import { EditorState, Compartment } from 'https://esm.sh/@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import {
   EditorView,
   lineNumbers,
   highlightActiveLine,
   highlightActiveLineGutter,
-} from 'https://esm.sh/@codemirror/view';
+} from '@codemirror/view';
 
-import { oneDark } from 'https://esm.sh/@codemirror/theme-one-dark';
+import { oneDark } from '@codemirror/theme-one-dark';
 
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
@@ -52,7 +52,7 @@ const editorView = new EditorView({
       highlightActiveLine(),
       highlightActiveLineGutter(),
       EditorView.lineWrapping,
-      // oneDark,
+      oneDark,
     ],
   }),
   //parent: document.body,
