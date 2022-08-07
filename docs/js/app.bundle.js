@@ -633,6 +633,17 @@ function codePointAt(str, pos) {
     return ((code0 - 0xd800) << 10) + (code1 - 0xdc00) + 0x10000;
 }
 /**
+Given a Unicode codepoint, return the JavaScript string that
+respresents it (like
+[`String.fromCodePoint`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/fromCodePoint)).
+*/
+function fromCodePoint(code) {
+    if (code <= 0xffff)
+        return String.fromCharCode(code);
+    code -= 0x10000;
+    return String.fromCharCode((code >> 10) + 0xd800, (code & 1023) + 0xdc00);
+}
+/**
 The amount of positions a character takes up a JavaScript string.
 */
 function codePointSize(code) { return code < 0x10000 ? 1 : 2; }
@@ -2459,9 +2470,9 @@ function extendTransaction(tr) {
     }
     return spec == tr ? tr : Transaction.create(state, tr.changes, tr.selection, spec.effects, spec.annotations, spec.scrollIntoView);
 }
-const none = [];
+const none$2 = [];
 function asArray$1(value) {
-    return value == null ? none : Array.isArray(value) ? value : [value];
+    return value == null ? none$2 : Array.isArray(value) ? value : [value];
 }
 
 /**
@@ -3818,6 +3829,25 @@ function findMinIndex(value, array) {
         }
     return found;
 }
+
+/**
+Count the column position at the given offset into the string,
+taking extending characters and tab size into account.
+*/
+function countColumn(string, tabSize, to = string.length) {
+    let n = 0;
+    for (let i = 0; i < to;) {
+        if (string.charCodeAt(i) == 9) {
+            n += tabSize - (n % tabSize);
+            i++;
+        }
+        else {
+            n++;
+            i = findClusterBreak(string, i);
+        }
+    }
+    return n;
+}
 /**
 Find the offset that corresponds to the given column position in a
 string, taking extending characters and tab size into account. By
@@ -4081,8 +4111,8 @@ var shift = {
 var chrome$1 = typeof navigator != "undefined" && /Chrome\/(\d+)/.exec(navigator.userAgent);
 typeof navigator != "undefined" && /Gecko\/\d+/.test(navigator.userAgent);
 var mac = typeof navigator != "undefined" && /Mac/.test(navigator.platform);
-typeof navigator != "undefined" && /MSIE \d|Trident\/(?:[7-9]|\d{2,})\..*rv:(\d+)/.exec(navigator.userAgent);
-mac || chrome$1 && +chrome$1[1] < 57;
+var ie$1 = typeof navigator != "undefined" && /MSIE \d|Trident\/(?:[7-9]|\d{2,})\..*rv:(\d+)/.exec(navigator.userAgent);
+var brokenModifierNames = mac || chrome$1 && +chrome$1[1] < 57;
 
 // Fill in the digit keys
 for (var i = 0; i < 10; i++) base[48 + i] = base[96 + i] = String(i);
@@ -4098,6 +4128,24 @@ for (var i = 65; i <= 90; i++) {
 
 // For each code that doesn't have a shift-equivalent, copy the base name
 for (var code in base) if (!shift.hasOwnProperty(code)) shift[code] = base[code];
+
+function keyName(event) {
+  var ignoreKey = brokenModifierNames && (event.ctrlKey || event.altKey || event.metaKey) ||
+    ie$1 && event.shiftKey && event.key && event.key.length == 1 ||
+    event.key == "Unidentified";
+  var name = (!ignoreKey && event.key) ||
+    (event.shiftKey ? shift : base)[event.keyCode] ||
+    event.key || "Unidentified";
+  // Edge sometimes produces wrong names (Issue #3)
+  if (name == "Esc") name = "Escape";
+  if (name == "Del") name = "Delete";
+  // https://developer.microsoft.com/en-us/microsoft-edge/platform/issues/8860571/
+  if (name == "Left") name = "ArrowLeft";
+  if (name == "Up") name = "ArrowUp";
+  if (name == "Right") name = "ArrowRight";
+  if (name == "Down") name = "ArrowDown";
+  return name
+}
 
 function getSelection(root) {
     let target;
@@ -5828,7 +5876,7 @@ const dragMovesSelection$1 = /*@__PURE__*/Facet.define();
 const mouseSelectionStyle = /*@__PURE__*/Facet.define();
 const exceptionSink = /*@__PURE__*/Facet.define();
 const updateListener = /*@__PURE__*/Facet.define();
-const inputHandler = /*@__PURE__*/Facet.define();
+const inputHandler$1 = /*@__PURE__*/Facet.define();
 const perLineTextDirection = /*@__PURE__*/Facet.define({
     combine: values => values.some(x => x)
 });
@@ -5844,7 +5892,7 @@ class ScrollTarget {
         return changes.empty ? this : new ScrollTarget(this.range.map(changes), this.y, this.x, this.yMargin, this.xMargin);
     }
 }
-const scrollIntoView = /*@__PURE__*/StateEffect.define({ map: (t, ch) => t.map(ch) });
+const scrollIntoView$1 = /*@__PURE__*/StateEffect.define({ map: (t, ch) => t.map(ch) });
 /**
 Log or report an unhandled exception in client code. Should
 probably only be used by extension code that allows client code to
@@ -9294,7 +9342,7 @@ function buildTheme(main, spec, scopes) {
         }
     });
 }
-const baseTheme$1 = /*@__PURE__*/buildTheme("." + baseThemeID, {
+const baseTheme$1$1 = /*@__PURE__*/buildTheme("." + baseThemeID, {
     "&.cm-editor": {
         position: "relative !important",
         boxSizing: "border-box",
@@ -10009,7 +10057,7 @@ function applyDOMChange(view, start, end, typeOver) {
                     dispatchKey(view.contentDOM, "Delete", 46))))
             return true;
         let text = change.insert.toString();
-        if (view.state.facet(inputHandler).some(h => h(view, change.from, change.to, text)))
+        if (view.state.facet(inputHandler$1).some(h => h(view, change.from, change.to, text)))
             return true;
         if (view.inputState.composing >= 0)
             view.inputState.composing++;
@@ -10295,7 +10343,7 @@ class EditorView {
                     scrollTarget = new ScrollTarget(main.empty ? main : EditorSelection.cursor(main.head, main.head > main.anchor ? -1 : 1));
                 }
                 for (let e of tr.effects)
-                    if (e.is(scrollIntoView))
+                    if (e.is(scrollIntoView$1))
                         scrollTarget = e.value;
             }
             this.viewState.update(update, scrollTarget);
@@ -10529,7 +10577,7 @@ class EditorView {
     }
     mountStyles() {
         this.styleModules = this.state.facet(styleModule);
-        StyleModule.mount(this.root, this.styleModules.concat(baseTheme$1).reverse());
+        StyleModule.mount(this.root, this.styleModules.concat(baseTheme$1$1).reverse());
     }
     readMeasured() {
         if (this.updateState == 2 /* Updating */)
@@ -10838,7 +10886,7 @@ class EditorView {
     cause it to scroll the given position or range into view.
     */
     static scrollIntoView(pos, options = {}) {
-        return scrollIntoView.of(new ScrollTarget(typeof pos == "number" ? EditorSelection.cursor(pos) : pos, options.y, options.x, options.yMargin, options.xMargin));
+        return scrollIntoView$1.of(new ScrollTarget(typeof pos == "number" ? EditorSelection.cursor(pos) : pos, options.y, options.x, options.yMargin, options.xMargin));
     }
     /**
     Returns an extension that can be used to add DOM event handlers.
@@ -10916,7 +10964,7 @@ positions between which the change was found, and the new
 content. When one returns true, no further input handlers are
 called and the default behavior is prevented.
 */
-EditorView.inputHandler = inputHandler;
+EditorView.inputHandler = inputHandler$1;
 /**
 By default, the editor assumes all its content has the same
 [text direction](https://codemirror.net/6/docs/ref/#view.Direction). Configure this with a `true`
@@ -11061,7 +11109,293 @@ function attrsFromFacet(view, facet, base) {
     return base;
 }
 
+const currentPlatform = browser.mac ? "mac" : browser.windows ? "win" : browser.linux ? "linux" : "key";
+function normalizeKeyName(name, platform) {
+    const parts = name.split(/-(?!$)/);
+    let result = parts[parts.length - 1];
+    if (result == "Space")
+        result = " ";
+    let alt, ctrl, shift, meta;
+    for (let i = 0; i < parts.length - 1; ++i) {
+        const mod = parts[i];
+        if (/^(cmd|meta|m)$/i.test(mod))
+            meta = true;
+        else if (/^a(lt)?$/i.test(mod))
+            alt = true;
+        else if (/^(c|ctrl|control)$/i.test(mod))
+            ctrl = true;
+        else if (/^s(hift)?$/i.test(mod))
+            shift = true;
+        else if (/^mod$/i.test(mod)) {
+            if (platform == "mac")
+                meta = true;
+            else
+                ctrl = true;
+        }
+        else
+            throw new Error("Unrecognized modifier name: " + mod);
+    }
+    if (alt)
+        result = "Alt-" + result;
+    if (ctrl)
+        result = "Ctrl-" + result;
+    if (meta)
+        result = "Meta-" + result;
+    if (shift)
+        result = "Shift-" + result;
+    return result;
+}
+function modifiers(name, event, shift) {
+    if (event.altKey)
+        name = "Alt-" + name;
+    if (event.ctrlKey)
+        name = "Ctrl-" + name;
+    if (event.metaKey)
+        name = "Meta-" + name;
+    if (shift !== false && event.shiftKey)
+        name = "Shift-" + name;
+    return name;
+}
+const handleKeyEvents = /*@__PURE__*/Prec.default(/*@__PURE__*/EditorView.domEventHandlers({
+    keydown(event, view) {
+        return runHandlers(getKeymap(view.state), event, view, "editor");
+    }
+}));
+/**
+Facet used for registering keymaps.
+
+You can add multiple keymaps to an editor. Their priorities
+determine their precedence (the ones specified early or with high
+priority get checked first). When a handler has returned `true`
+for a given key, no further handlers are called.
+*/
+const keymap = /*@__PURE__*/Facet.define({ enables: handleKeyEvents });
+const Keymaps = /*@__PURE__*/new WeakMap();
+// This is hidden behind an indirection, rather than directly computed
+// by the facet, to keep internal types out of the facet's type.
+function getKeymap(state) {
+    let bindings = state.facet(keymap);
+    let map = Keymaps.get(bindings);
+    if (!map)
+        Keymaps.set(bindings, map = buildKeymap(bindings.reduce((a, b) => a.concat(b), [])));
+    return map;
+}
+let storedPrefix = null;
+const PrefixTimeout = 4000;
+function buildKeymap(bindings, platform = currentPlatform) {
+    let bound = Object.create(null);
+    let isPrefix = Object.create(null);
+    let checkPrefix = (name, is) => {
+        let current = isPrefix[name];
+        if (current == null)
+            isPrefix[name] = is;
+        else if (current != is)
+            throw new Error("Key binding " + name + " is used both as a regular binding and as a multi-stroke prefix");
+    };
+    let add = (scope, key, command, preventDefault) => {
+        let scopeObj = bound[scope] || (bound[scope] = Object.create(null));
+        let parts = key.split(/ (?!$)/).map(k => normalizeKeyName(k, platform));
+        for (let i = 1; i < parts.length; i++) {
+            let prefix = parts.slice(0, i).join(" ");
+            checkPrefix(prefix, true);
+            if (!scopeObj[prefix])
+                scopeObj[prefix] = {
+                    preventDefault: true,
+                    commands: [(view) => {
+                            let ourObj = storedPrefix = { view, prefix, scope };
+                            setTimeout(() => { if (storedPrefix == ourObj)
+                                storedPrefix = null; }, PrefixTimeout);
+                            return true;
+                        }]
+                };
+        }
+        let full = parts.join(" ");
+        checkPrefix(full, false);
+        let binding = scopeObj[full] || (scopeObj[full] = { preventDefault: false, commands: [] });
+        binding.commands.push(command);
+        if (preventDefault)
+            binding.preventDefault = true;
+    };
+    for (let b of bindings) {
+        let name = b[platform] || b.key;
+        if (!name)
+            continue;
+        for (let scope of b.scope ? b.scope.split(" ") : ["editor"]) {
+            add(scope, name, b.run, b.preventDefault);
+            if (b.shift)
+                add(scope, "Shift-" + name, b.shift, b.preventDefault);
+        }
+    }
+    return bound;
+}
+function runHandlers(map, event, view, scope) {
+    let name = keyName(event);
+    let charCode = codePointAt(name, 0), isChar = codePointSize(charCode) == name.length && name != " ";
+    let prefix = "", fallthrough = false;
+    if (storedPrefix && storedPrefix.view == view && storedPrefix.scope == scope) {
+        prefix = storedPrefix.prefix + " ";
+        if (fallthrough = modifierCodes.indexOf(event.keyCode) < 0)
+            storedPrefix = null;
+    }
+    let runFor = (binding) => {
+        if (binding) {
+            for (let cmd of binding.commands)
+                if (cmd(view))
+                    return true;
+            if (binding.preventDefault)
+                fallthrough = true;
+        }
+        return false;
+    };
+    let scopeObj = map[scope], baseName;
+    if (scopeObj) {
+        if (runFor(scopeObj[prefix + modifiers(name, event, !isChar)]))
+            return true;
+        if (isChar && (event.shiftKey || event.altKey || event.metaKey || charCode > 127) &&
+            (baseName = base[event.keyCode]) && baseName != name) {
+            if (runFor(scopeObj[prefix + modifiers(baseName, event, true)]))
+                return true;
+            else if (event.shiftKey && shift[event.keyCode] != baseName &&
+                runFor(scopeObj[prefix + modifiers(shift[event.keyCode], event, false)]))
+                return true;
+        }
+        else if (isChar && event.shiftKey) {
+            if (runFor(scopeObj[prefix + modifiers(name, event, true)]))
+                return true;
+        }
+    }
+    return fallthrough;
+}
+
 const CanHidePrimary = !browser.ios; // FIXME test IE
+const selectionConfig = /*@__PURE__*/Facet.define({
+    combine(configs) {
+        return combineConfig(configs, {
+            cursorBlinkRate: 1200,
+            drawRangeCursor: true
+        }, {
+            cursorBlinkRate: (a, b) => Math.min(a, b),
+            drawRangeCursor: (a, b) => a || b
+        });
+    }
+});
+/**
+Returns an extension that hides the browser's native selection and
+cursor, replacing the selection with a background behind the text
+(with the `cm-selectionBackground` class), and the
+cursors with elements overlaid over the code (using
+`cm-cursor-primary` and `cm-cursor-secondary`).
+
+This allows the editor to display secondary selection ranges, and
+tends to produce a type of selection more in line with that users
+expect in a text editor (the native selection styling will often
+leave gaps between lines and won't fill the horizontal space after
+a line when the selection continues past it).
+
+It does have a performance cost, in that it requires an extra DOM
+layout cycle for many updates (the selection is drawn based on DOM
+layout information that's only available after laying out the
+content).
+*/
+function drawSelection(config = {}) {
+    return [
+        selectionConfig.of(config),
+        drawSelectionPlugin,
+        hideNativeSelection
+    ];
+}
+class Piece {
+    constructor(left, top, width, height, className) {
+        this.left = left;
+        this.top = top;
+        this.width = width;
+        this.height = height;
+        this.className = className;
+    }
+    draw() {
+        let elt = document.createElement("div");
+        elt.className = this.className;
+        this.adjust(elt);
+        return elt;
+    }
+    adjust(elt) {
+        elt.style.left = this.left + "px";
+        elt.style.top = this.top + "px";
+        if (this.width >= 0)
+            elt.style.width = this.width + "px";
+        elt.style.height = this.height + "px";
+    }
+    eq(p) {
+        return this.left == p.left && this.top == p.top && this.width == p.width && this.height == p.height &&
+            this.className == p.className;
+    }
+}
+const drawSelectionPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
+    constructor(view) {
+        this.view = view;
+        this.rangePieces = [];
+        this.cursors = [];
+        this.measureReq = { read: this.readPos.bind(this), write: this.drawSel.bind(this) };
+        this.selectionLayer = view.scrollDOM.appendChild(document.createElement("div"));
+        this.selectionLayer.className = "cm-selectionLayer";
+        this.selectionLayer.setAttribute("aria-hidden", "true");
+        this.cursorLayer = view.scrollDOM.appendChild(document.createElement("div"));
+        this.cursorLayer.className = "cm-cursorLayer";
+        this.cursorLayer.setAttribute("aria-hidden", "true");
+        view.requestMeasure(this.measureReq);
+        this.setBlinkRate();
+    }
+    setBlinkRate() {
+        this.cursorLayer.style.animationDuration = this.view.state.facet(selectionConfig).cursorBlinkRate + "ms";
+    }
+    update(update) {
+        let confChanged = update.startState.facet(selectionConfig) != update.state.facet(selectionConfig);
+        if (confChanged || update.selectionSet || update.geometryChanged || update.viewportChanged)
+            this.view.requestMeasure(this.measureReq);
+        if (update.transactions.some(tr => tr.scrollIntoView))
+            this.cursorLayer.style.animationName = this.cursorLayer.style.animationName == "cm-blink" ? "cm-blink2" : "cm-blink";
+        if (confChanged)
+            this.setBlinkRate();
+    }
+    readPos() {
+        let { state } = this.view, conf = state.facet(selectionConfig);
+        let rangePieces = state.selection.ranges.map(r => r.empty ? [] : measureRange(this.view, r)).reduce((a, b) => a.concat(b));
+        let cursors = [];
+        for (let r of state.selection.ranges) {
+            let prim = r == state.selection.main;
+            if (r.empty ? !prim || CanHidePrimary : conf.drawRangeCursor) {
+                let piece = measureCursor(this.view, r, prim);
+                if (piece)
+                    cursors.push(piece);
+            }
+        }
+        return { rangePieces, cursors };
+    }
+    drawSel({ rangePieces, cursors }) {
+        if (rangePieces.length != this.rangePieces.length || rangePieces.some((p, i) => !p.eq(this.rangePieces[i]))) {
+            this.selectionLayer.textContent = "";
+            for (let p of rangePieces)
+                this.selectionLayer.appendChild(p.draw());
+            this.rangePieces = rangePieces;
+        }
+        if (cursors.length != this.cursors.length || cursors.some((c, i) => !c.eq(this.cursors[i]))) {
+            let oldCursors = this.cursorLayer.children;
+            if (oldCursors.length !== cursors.length) {
+                this.cursorLayer.textContent = "";
+                for (const c of cursors)
+                    this.cursorLayer.appendChild(c.draw());
+            }
+            else {
+                cursors.forEach((c, idx) => c.adjust(oldCursors[idx]));
+            }
+            this.cursors = cursors;
+        }
+    }
+    destroy() {
+        this.selectionLayer.remove();
+        this.cursorLayer.remove();
+    }
+});
 const themeSpec = {
     ".cm-line": {
         "& ::selection": { backgroundColor: "transparent !important" },
@@ -11070,6 +11404,476 @@ const themeSpec = {
 };
 if (CanHidePrimary)
     themeSpec[".cm-line"].caretColor = "transparent !important";
+const hideNativeSelection = /*@__PURE__*/Prec.highest(/*@__PURE__*/EditorView.theme(themeSpec));
+function getBase(view) {
+    let rect = view.scrollDOM.getBoundingClientRect();
+    let left = view.textDirection == Direction.LTR ? rect.left : rect.right - view.scrollDOM.clientWidth;
+    return { left: left - view.scrollDOM.scrollLeft, top: rect.top - view.scrollDOM.scrollTop };
+}
+function wrappedLine(view, pos, inside) {
+    let range = EditorSelection.cursor(pos);
+    return { from: Math.max(inside.from, view.moveToLineBoundary(range, false, true).from),
+        to: Math.min(inside.to, view.moveToLineBoundary(range, true, true).from),
+        type: BlockType.Text };
+}
+function blockAt(view, pos) {
+    let line = view.lineBlockAt(pos);
+    if (Array.isArray(line.type))
+        for (let l of line.type) {
+            if (l.to > pos || l.to == pos && (l.to == line.to || l.type == BlockType.Text))
+                return l;
+        }
+    return line;
+}
+function measureRange(view, range) {
+    if (range.to <= view.viewport.from || range.from >= view.viewport.to)
+        return [];
+    let from = Math.max(range.from, view.viewport.from), to = Math.min(range.to, view.viewport.to);
+    let ltr = view.textDirection == Direction.LTR;
+    let content = view.contentDOM, contentRect = content.getBoundingClientRect(), base = getBase(view);
+    let lineStyle = window.getComputedStyle(content.firstChild);
+    let leftSide = contentRect.left + parseInt(lineStyle.paddingLeft) + Math.min(0, parseInt(lineStyle.textIndent));
+    let rightSide = contentRect.right - parseInt(lineStyle.paddingRight);
+    let startBlock = blockAt(view, from), endBlock = blockAt(view, to);
+    let visualStart = startBlock.type == BlockType.Text ? startBlock : null;
+    let visualEnd = endBlock.type == BlockType.Text ? endBlock : null;
+    if (view.lineWrapping) {
+        if (visualStart)
+            visualStart = wrappedLine(view, from, visualStart);
+        if (visualEnd)
+            visualEnd = wrappedLine(view, to, visualEnd);
+    }
+    if (visualStart && visualEnd && visualStart.from == visualEnd.from) {
+        return pieces(drawForLine(range.from, range.to, visualStart));
+    }
+    else {
+        let top = visualStart ? drawForLine(range.from, null, visualStart) : drawForWidget(startBlock, false);
+        let bottom = visualEnd ? drawForLine(null, range.to, visualEnd) : drawForWidget(endBlock, true);
+        let between = [];
+        if ((visualStart || startBlock).to < (visualEnd || endBlock).from - 1)
+            between.push(piece(leftSide, top.bottom, rightSide, bottom.top));
+        else if (top.bottom < bottom.top && view.elementAtHeight((top.bottom + bottom.top) / 2).type == BlockType.Text)
+            top.bottom = bottom.top = (top.bottom + bottom.top) / 2;
+        return pieces(top).concat(between).concat(pieces(bottom));
+    }
+    function piece(left, top, right, bottom) {
+        return new Piece(left - base.left, top - base.top - 0.01 /* Epsilon */, right - left, bottom - top + 0.01 /* Epsilon */, "cm-selectionBackground");
+    }
+    function pieces({ top, bottom, horizontal }) {
+        let pieces = [];
+        for (let i = 0; i < horizontal.length; i += 2)
+            pieces.push(piece(horizontal[i], top, horizontal[i + 1], bottom));
+        return pieces;
+    }
+    // Gets passed from/to in line-local positions
+    function drawForLine(from, to, line) {
+        let top = 1e9, bottom = -1e9, horizontal = [];
+        function addSpan(from, fromOpen, to, toOpen, dir) {
+            // Passing 2/-2 is a kludge to force the view to return
+            // coordinates on the proper side of block widgets, since
+            // normalizing the side there, though appropriate for most
+            // coordsAtPos queries, would break selection drawing.
+            let fromCoords = view.coordsAtPos(from, (from == line.to ? -2 : 2));
+            let toCoords = view.coordsAtPos(to, (to == line.from ? 2 : -2));
+            top = Math.min(fromCoords.top, toCoords.top, top);
+            bottom = Math.max(fromCoords.bottom, toCoords.bottom, bottom);
+            if (dir == Direction.LTR)
+                horizontal.push(ltr && fromOpen ? leftSide : fromCoords.left, ltr && toOpen ? rightSide : toCoords.right);
+            else
+                horizontal.push(!ltr && toOpen ? leftSide : toCoords.left, !ltr && fromOpen ? rightSide : fromCoords.right);
+        }
+        let start = from !== null && from !== void 0 ? from : line.from, end = to !== null && to !== void 0 ? to : line.to;
+        // Split the range by visible range and document line
+        for (let r of view.visibleRanges)
+            if (r.to > start && r.from < end) {
+                for (let pos = Math.max(r.from, start), endPos = Math.min(r.to, end);;) {
+                    let docLine = view.state.doc.lineAt(pos);
+                    for (let span of view.bidiSpans(docLine)) {
+                        let spanFrom = span.from + docLine.from, spanTo = span.to + docLine.from;
+                        if (spanFrom >= endPos)
+                            break;
+                        if (spanTo > pos)
+                            addSpan(Math.max(spanFrom, pos), from == null && spanFrom <= start, Math.min(spanTo, endPos), to == null && spanTo >= end, span.dir);
+                    }
+                    pos = docLine.to + 1;
+                    if (pos >= endPos)
+                        break;
+                }
+            }
+        if (horizontal.length == 0)
+            addSpan(start, from == null, end, to == null, view.textDirection);
+        return { top, bottom, horizontal };
+    }
+    function drawForWidget(block, top) {
+        let y = contentRect.top + (top ? block.top : block.bottom);
+        return { top: y, bottom: y, horizontal: [] };
+    }
+}
+function measureCursor(view, cursor, primary) {
+    let pos = view.coordsAtPos(cursor.head, cursor.assoc || 1);
+    if (!pos)
+        return null;
+    let base = getBase(view);
+    return new Piece(pos.left - base.left, pos.top - base.top, -1, pos.bottom - pos.top, primary ? "cm-cursor cm-cursor-primary" : "cm-cursor cm-cursor-secondary");
+}
+
+const setDropCursorPos = /*@__PURE__*/StateEffect.define({
+    map(pos, mapping) { return pos == null ? null : mapping.mapPos(pos); }
+});
+const dropCursorPos = /*@__PURE__*/StateField.define({
+    create() { return null; },
+    update(pos, tr) {
+        if (pos != null)
+            pos = tr.changes.mapPos(pos);
+        return tr.effects.reduce((pos, e) => e.is(setDropCursorPos) ? e.value : pos, pos);
+    }
+});
+const drawDropCursor = /*@__PURE__*/ViewPlugin.fromClass(class {
+    constructor(view) {
+        this.view = view;
+        this.cursor = null;
+        this.measureReq = { read: this.readPos.bind(this), write: this.drawCursor.bind(this) };
+    }
+    update(update) {
+        var _a;
+        let cursorPos = update.state.field(dropCursorPos);
+        if (cursorPos == null) {
+            if (this.cursor != null) {
+                (_a = this.cursor) === null || _a === void 0 ? void 0 : _a.remove();
+                this.cursor = null;
+            }
+        }
+        else {
+            if (!this.cursor) {
+                this.cursor = this.view.scrollDOM.appendChild(document.createElement("div"));
+                this.cursor.className = "cm-dropCursor";
+            }
+            if (update.startState.field(dropCursorPos) != cursorPos || update.docChanged || update.geometryChanged)
+                this.view.requestMeasure(this.measureReq);
+        }
+    }
+    readPos() {
+        let pos = this.view.state.field(dropCursorPos);
+        let rect = pos != null && this.view.coordsAtPos(pos);
+        if (!rect)
+            return null;
+        let outer = this.view.scrollDOM.getBoundingClientRect();
+        return {
+            left: rect.left - outer.left + this.view.scrollDOM.scrollLeft,
+            top: rect.top - outer.top + this.view.scrollDOM.scrollTop,
+            height: rect.bottom - rect.top
+        };
+    }
+    drawCursor(pos) {
+        if (this.cursor) {
+            if (pos) {
+                this.cursor.style.left = pos.left + "px";
+                this.cursor.style.top = pos.top + "px";
+                this.cursor.style.height = pos.height + "px";
+            }
+            else {
+                this.cursor.style.left = "-100000px";
+            }
+        }
+    }
+    destroy() {
+        if (this.cursor)
+            this.cursor.remove();
+    }
+    setDropPos(pos) {
+        if (this.view.state.field(dropCursorPos) != pos)
+            this.view.dispatch({ effects: setDropCursorPos.of(pos) });
+    }
+}, {
+    eventHandlers: {
+        dragover(event) {
+            this.setDropPos(this.view.posAtCoords({ x: event.clientX, y: event.clientY }));
+        },
+        dragleave(event) {
+            if (event.target == this.view.contentDOM || !this.view.contentDOM.contains(event.relatedTarget))
+                this.setDropPos(null);
+        },
+        dragend() {
+            this.setDropPos(null);
+        },
+        drop() {
+            this.setDropPos(null);
+        }
+    }
+});
+/**
+Draws a cursor at the current drop position when something is
+dragged over the editor.
+*/
+function dropCursor() {
+    return [dropCursorPos, drawDropCursor];
+}
+
+function iterMatches(doc, re, from, to, f) {
+    re.lastIndex = 0;
+    for (let cursor = doc.iterRange(from, to), pos = from, m; !cursor.next().done; pos += cursor.value.length) {
+        if (!cursor.lineBreak)
+            while (m = re.exec(cursor.value))
+                f(pos + m.index, m);
+    }
+}
+function matchRanges(view, maxLength) {
+    let visible = view.visibleRanges;
+    if (visible.length == 1 && visible[0].from == view.viewport.from &&
+        visible[0].to == view.viewport.to)
+        return visible;
+    let result = [];
+    for (let { from, to } of visible) {
+        from = Math.max(view.state.doc.lineAt(from).from, from - maxLength);
+        to = Math.min(view.state.doc.lineAt(to).to, to + maxLength);
+        if (result.length && result[result.length - 1].to >= from)
+            result[result.length - 1].to = to;
+        else
+            result.push({ from, to });
+    }
+    return result;
+}
+/**
+Helper class used to make it easier to maintain decorations on
+visible code that matches a given regular expression. To be used
+in a [view plugin](https://codemirror.net/6/docs/ref/#view.ViewPlugin). Instances of this object
+represent a matching configuration.
+*/
+class MatchDecorator {
+    /**
+    Create a decorator.
+    */
+    constructor(config) {
+        const { regexp, decoration, decorate, boundary, maxLength = 1000 } = config;
+        if (!regexp.global)
+            throw new RangeError("The regular expression given to MatchDecorator should have its 'g' flag set");
+        this.regexp = regexp;
+        if (decorate) {
+            this.addMatch = (match, view, from, add) => decorate(add, from, from + match[0].length, match, view);
+        }
+        else if (decoration) {
+            let getDeco = typeof decoration == "function" ? decoration : () => decoration;
+            this.addMatch = (match, view, from, add) => add(from, from + match[0].length, getDeco(match, view, from));
+        }
+        else {
+            throw new RangeError("Either 'decorate' or 'decoration' should be provided to MatchDecorator");
+        }
+        this.boundary = boundary;
+        this.maxLength = maxLength;
+    }
+    /**
+    Compute the full set of decorations for matches in the given
+    view's viewport. You'll want to call this when initializing your
+    plugin.
+    */
+    createDeco(view) {
+        let build = new RangeSetBuilder(), add = build.add.bind(build);
+        for (let { from, to } of matchRanges(view, this.maxLength))
+            iterMatches(view.state.doc, this.regexp, from, to, (from, m) => this.addMatch(m, view, from, add));
+        return build.finish();
+    }
+    /**
+    Update a set of decorations for a view update. `deco` _must_ be
+    the set of decorations produced by _this_ `MatchDecorator` for
+    the view state before the update.
+    */
+    updateDeco(update, deco) {
+        let changeFrom = 1e9, changeTo = -1;
+        if (update.docChanged)
+            update.changes.iterChanges((_f, _t, from, to) => {
+                if (to > update.view.viewport.from && from < update.view.viewport.to) {
+                    changeFrom = Math.min(from, changeFrom);
+                    changeTo = Math.max(to, changeTo);
+                }
+            });
+        if (update.viewportChanged || changeTo - changeFrom > 1000)
+            return this.createDeco(update.view);
+        if (changeTo > -1)
+            return this.updateRange(update.view, deco.map(update.changes), changeFrom, changeTo);
+        return deco;
+    }
+    updateRange(view, deco, updateFrom, updateTo) {
+        for (let r of view.visibleRanges) {
+            let from = Math.max(r.from, updateFrom), to = Math.min(r.to, updateTo);
+            if (to > from) {
+                let fromLine = view.state.doc.lineAt(from), toLine = fromLine.to < to ? view.state.doc.lineAt(to) : fromLine;
+                let start = Math.max(r.from, fromLine.from), end = Math.min(r.to, toLine.to);
+                if (this.boundary) {
+                    for (; from > fromLine.from; from--)
+                        if (this.boundary.test(fromLine.text[from - 1 - fromLine.from])) {
+                            start = from;
+                            break;
+                        }
+                    for (; to < toLine.to; to++)
+                        if (this.boundary.test(toLine.text[to - toLine.from])) {
+                            end = to;
+                            break;
+                        }
+                }
+                let ranges = [], m;
+                let add = (from, to, deco) => ranges.push(deco.range(from, to));
+                if (fromLine == toLine) {
+                    this.regexp.lastIndex = start - fromLine.from;
+                    while ((m = this.regexp.exec(fromLine.text)) && m.index < end - fromLine.from)
+                        this.addMatch(m, view, m.index + fromLine.from, add);
+                }
+                else {
+                    iterMatches(view.state.doc, this.regexp, start, end, (from, m) => this.addMatch(m, view, from, add));
+                }
+                deco = deco.update({ filterFrom: start, filterTo: end, filter: (from, to) => from < start || to > end, add: ranges });
+            }
+        }
+        return deco;
+    }
+}
+
+const UnicodeRegexpSupport = /x/.unicode != null ? "gu" : "g";
+const Specials = /*@__PURE__*/new RegExp("[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u00ad\u061c\u200b\u200e\u200f\u2028\u2029\u202d\u202e\u2066\u2067\u2069\ufeff\ufff9-\ufffc]", UnicodeRegexpSupport);
+const Names = {
+    0: "null",
+    7: "bell",
+    8: "backspace",
+    10: "newline",
+    11: "vertical tab",
+    13: "carriage return",
+    27: "escape",
+    8203: "zero width space",
+    8204: "zero width non-joiner",
+    8205: "zero width joiner",
+    8206: "left-to-right mark",
+    8207: "right-to-left mark",
+    8232: "line separator",
+    8237: "left-to-right override",
+    8238: "right-to-left override",
+    8294: "left-to-right isolate",
+    8295: "right-to-left isolate",
+    8297: "pop directional isolate",
+    8233: "paragraph separator",
+    65279: "zero width no-break space",
+    65532: "object replacement"
+};
+let _supportsTabSize = null;
+function supportsTabSize() {
+    var _a;
+    if (_supportsTabSize == null && typeof document != "undefined" && document.body) {
+        let styles = document.body.style;
+        _supportsTabSize = ((_a = styles.tabSize) !== null && _a !== void 0 ? _a : styles.MozTabSize) != null;
+    }
+    return _supportsTabSize || false;
+}
+const specialCharConfig = /*@__PURE__*/Facet.define({
+    combine(configs) {
+        let config = combineConfig(configs, {
+            render: null,
+            specialChars: Specials,
+            addSpecialChars: null
+        });
+        if (config.replaceTabs = !supportsTabSize())
+            config.specialChars = new RegExp("\t|" + config.specialChars.source, UnicodeRegexpSupport);
+        if (config.addSpecialChars)
+            config.specialChars = new RegExp(config.specialChars.source + "|" + config.addSpecialChars.source, UnicodeRegexpSupport);
+        return config;
+    }
+});
+/**
+Returns an extension that installs highlighting of special
+characters.
+*/
+function highlightSpecialChars(
+/**
+Configuration options.
+*/
+config = {}) {
+    return [specialCharConfig.of(config), specialCharPlugin()];
+}
+let _plugin = null;
+function specialCharPlugin() {
+    return _plugin || (_plugin = ViewPlugin.fromClass(class {
+        constructor(view) {
+            this.view = view;
+            this.decorations = Decoration.none;
+            this.decorationCache = Object.create(null);
+            this.decorator = this.makeDecorator(view.state.facet(specialCharConfig));
+            this.decorations = this.decorator.createDeco(view);
+        }
+        makeDecorator(conf) {
+            return new MatchDecorator({
+                regexp: conf.specialChars,
+                decoration: (m, view, pos) => {
+                    let { doc } = view.state;
+                    let code = codePointAt(m[0], 0);
+                    if (code == 9) {
+                        let line = doc.lineAt(pos);
+                        let size = view.state.tabSize, col = countColumn(line.text, size, pos - line.from);
+                        return Decoration.replace({ widget: new TabWidget((size - (col % size)) * this.view.defaultCharacterWidth) });
+                    }
+                    return this.decorationCache[code] ||
+                        (this.decorationCache[code] = Decoration.replace({ widget: new SpecialCharWidget(conf, code) }));
+                },
+                boundary: conf.replaceTabs ? undefined : /[^]/
+            });
+        }
+        update(update) {
+            let conf = update.state.facet(specialCharConfig);
+            if (update.startState.facet(specialCharConfig) != conf) {
+                this.decorator = this.makeDecorator(conf);
+                this.decorations = this.decorator.createDeco(update.view);
+            }
+            else {
+                this.decorations = this.decorator.updateDeco(update, this.decorations);
+            }
+        }
+    }, {
+        decorations: v => v.decorations
+    }));
+}
+const DefaultPlaceholder = "\u2022";
+// Assigns placeholder characters from the Control Pictures block to
+// ASCII control characters
+function placeholder$1(code) {
+    if (code >= 32)
+        return DefaultPlaceholder;
+    if (code == 10)
+        return "\u2424";
+    return String.fromCharCode(9216 + code);
+}
+class SpecialCharWidget extends WidgetType {
+    constructor(options, code) {
+        super();
+        this.options = options;
+        this.code = code;
+    }
+    eq(other) { return other.code == this.code; }
+    toDOM(view) {
+        let ph = placeholder$1(this.code);
+        let desc = view.state.phrase("Control character") + " " + (Names[this.code] || "0x" + this.code.toString(16));
+        let custom = this.options.render && this.options.render(this.code, desc, ph);
+        if (custom)
+            return custom;
+        let span = document.createElement("span");
+        span.textContent = ph;
+        span.title = desc;
+        span.setAttribute("aria-label", desc);
+        span.className = "cm-specialChar";
+        return span;
+    }
+    ignoreEvent() { return false; }
+}
+class TabWidget extends WidgetType {
+    constructor(width) {
+        super();
+        this.width = width;
+    }
+    eq(other) { return other.width == this.width; }
+    toDOM() {
+        let span = document.createElement("span");
+        span.textContent = "\t";
+        span.className = "cm-tab";
+        span.style.width = this.width + "px";
+        return span;
+    }
+    ignoreEvent() { return false; }
+}
 
 /**
 Mark lines that have a cursor on them with the `"cm-activeLine"`
@@ -11103,6 +11907,325 @@ const activeLineHighlighter = /*@__PURE__*/ViewPlugin.fromClass(class {
 }, {
     decorations: v => v.decorations
 });
+
+const Outside = "-10000px";
+class TooltipViewManager {
+    constructor(view, facet, createTooltipView) {
+        this.facet = facet;
+        this.createTooltipView = createTooltipView;
+        this.input = view.state.facet(facet);
+        this.tooltips = this.input.filter(t => t);
+        this.tooltipViews = this.tooltips.map(createTooltipView);
+    }
+    update(update) {
+        let input = update.state.facet(this.facet);
+        let tooltips = input.filter(x => x);
+        if (input === this.input) {
+            for (let t of this.tooltipViews)
+                if (t.update)
+                    t.update(update);
+            return false;
+        }
+        let tooltipViews = [];
+        for (let i = 0; i < tooltips.length; i++) {
+            let tip = tooltips[i], known = -1;
+            if (!tip)
+                continue;
+            for (let i = 0; i < this.tooltips.length; i++) {
+                let other = this.tooltips[i];
+                if (other && other.create == tip.create)
+                    known = i;
+            }
+            if (known < 0) {
+                tooltipViews[i] = this.createTooltipView(tip);
+            }
+            else {
+                let tooltipView = tooltipViews[i] = this.tooltipViews[known];
+                if (tooltipView.update)
+                    tooltipView.update(update);
+            }
+        }
+        for (let t of this.tooltipViews)
+            if (tooltipViews.indexOf(t) < 0)
+                t.dom.remove();
+        this.input = input;
+        this.tooltips = tooltips;
+        this.tooltipViews = tooltipViews;
+        return true;
+    }
+}
+function windowSpace() {
+    return { top: 0, left: 0, bottom: innerHeight, right: innerWidth };
+}
+const tooltipConfig = /*@__PURE__*/Facet.define({
+    combine: values => {
+        var _a, _b, _c;
+        return ({
+            position: browser.ios ? "absolute" : ((_a = values.find(conf => conf.position)) === null || _a === void 0 ? void 0 : _a.position) || "fixed",
+            parent: ((_b = values.find(conf => conf.parent)) === null || _b === void 0 ? void 0 : _b.parent) || null,
+            tooltipSpace: ((_c = values.find(conf => conf.tooltipSpace)) === null || _c === void 0 ? void 0 : _c.tooltipSpace) || windowSpace,
+        });
+    }
+});
+const tooltipPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
+    constructor(view) {
+        var _a;
+        this.view = view;
+        this.inView = true;
+        this.lastTransaction = 0;
+        this.measureTimeout = -1;
+        let config = view.state.facet(tooltipConfig);
+        this.position = config.position;
+        this.parent = config.parent;
+        this.classes = view.themeClasses;
+        this.createContainer();
+        this.measureReq = { read: this.readMeasure.bind(this), write: this.writeMeasure.bind(this), key: this };
+        this.manager = new TooltipViewManager(view, showTooltip, t => this.createTooltip(t));
+        this.intersectionObserver = typeof IntersectionObserver == "function" ? new IntersectionObserver(entries => {
+            if (Date.now() > this.lastTransaction - 50 &&
+                entries.length > 0 && entries[entries.length - 1].intersectionRatio < 1)
+                this.measureSoon();
+        }, { threshold: [1] }) : null;
+        this.observeIntersection();
+        (_a = view.dom.ownerDocument.defaultView) === null || _a === void 0 ? void 0 : _a.addEventListener("resize", this.measureSoon = this.measureSoon.bind(this));
+        this.maybeMeasure();
+    }
+    createContainer() {
+        if (this.parent) {
+            this.container = document.createElement("div");
+            this.container.style.position = "relative";
+            this.container.className = this.view.themeClasses;
+            this.parent.appendChild(this.container);
+        }
+        else {
+            this.container = this.view.dom;
+        }
+    }
+    observeIntersection() {
+        if (this.intersectionObserver) {
+            this.intersectionObserver.disconnect();
+            for (let tooltip of this.manager.tooltipViews)
+                this.intersectionObserver.observe(tooltip.dom);
+        }
+    }
+    measureSoon() {
+        if (this.measureTimeout < 0)
+            this.measureTimeout = setTimeout(() => {
+                this.measureTimeout = -1;
+                this.maybeMeasure();
+            }, 50);
+    }
+    update(update) {
+        if (update.transactions.length)
+            this.lastTransaction = Date.now();
+        let updated = this.manager.update(update);
+        if (updated)
+            this.observeIntersection();
+        let shouldMeasure = updated || update.geometryChanged;
+        let newConfig = update.state.facet(tooltipConfig);
+        if (newConfig.position != this.position) {
+            this.position = newConfig.position;
+            for (let t of this.manager.tooltipViews)
+                t.dom.style.position = this.position;
+            shouldMeasure = true;
+        }
+        if (newConfig.parent != this.parent) {
+            if (this.parent)
+                this.container.remove();
+            this.parent = newConfig.parent;
+            this.createContainer();
+            for (let t of this.manager.tooltipViews)
+                this.container.appendChild(t.dom);
+            shouldMeasure = true;
+        }
+        else if (this.parent && this.view.themeClasses != this.classes) {
+            this.classes = this.container.className = this.view.themeClasses;
+        }
+        if (shouldMeasure)
+            this.maybeMeasure();
+    }
+    createTooltip(tooltip) {
+        let tooltipView = tooltip.create(this.view);
+        tooltipView.dom.classList.add("cm-tooltip");
+        if (tooltip.arrow && !tooltipView.dom.querySelector(".cm-tooltip > .cm-tooltip-arrow")) {
+            let arrow = document.createElement("div");
+            arrow.className = "cm-tooltip-arrow";
+            tooltipView.dom.appendChild(arrow);
+        }
+        tooltipView.dom.style.position = this.position;
+        tooltipView.dom.style.top = Outside;
+        this.container.appendChild(tooltipView.dom);
+        if (tooltipView.mount)
+            tooltipView.mount(this.view);
+        return tooltipView;
+    }
+    destroy() {
+        var _a, _b;
+        (_a = this.view.dom.ownerDocument.defaultView) === null || _a === void 0 ? void 0 : _a.removeEventListener("resize", this.measureSoon);
+        for (let { dom } of this.manager.tooltipViews)
+            dom.remove();
+        (_b = this.intersectionObserver) === null || _b === void 0 ? void 0 : _b.disconnect();
+        clearTimeout(this.measureTimeout);
+    }
+    readMeasure() {
+        let editor = this.view.dom.getBoundingClientRect();
+        return {
+            editor,
+            parent: this.parent ? this.container.getBoundingClientRect() : editor,
+            pos: this.manager.tooltips.map((t, i) => {
+                let tv = this.manager.tooltipViews[i];
+                return tv.getCoords ? tv.getCoords(t.pos) : this.view.coordsAtPos(t.pos);
+            }),
+            size: this.manager.tooltipViews.map(({ dom }) => dom.getBoundingClientRect()),
+            space: this.view.state.facet(tooltipConfig).tooltipSpace(this.view),
+        };
+    }
+    writeMeasure(measured) {
+        let { editor, space } = measured;
+        let others = [];
+        for (let i = 0; i < this.manager.tooltips.length; i++) {
+            let tooltip = this.manager.tooltips[i], tView = this.manager.tooltipViews[i], { dom } = tView;
+            let pos = measured.pos[i], size = measured.size[i];
+            // Hide tooltips that are outside of the editor.
+            if (!pos || pos.bottom <= Math.max(editor.top, space.top) ||
+                pos.top >= Math.min(editor.bottom, space.bottom) ||
+                pos.right < Math.max(editor.left, space.left) - .1 ||
+                pos.left > Math.min(editor.right, space.right) + .1) {
+                dom.style.top = Outside;
+                continue;
+            }
+            let arrow = tooltip.arrow ? tView.dom.querySelector(".cm-tooltip-arrow") : null;
+            let arrowHeight = arrow ? 7 /* Size */ : 0;
+            let width = size.right - size.left, height = size.bottom - size.top;
+            let offset = tView.offset || noOffset, ltr = this.view.textDirection == Direction.LTR;
+            let left = size.width > space.right - space.left ? (ltr ? space.left : space.right - size.width)
+                : ltr ? Math.min(pos.left - (arrow ? 14 /* Offset */ : 0) + offset.x, space.right - width)
+                    : Math.max(space.left, pos.left - width + (arrow ? 14 /* Offset */ : 0) - offset.x);
+            let above = !!tooltip.above;
+            if (!tooltip.strictSide && (above
+                ? pos.top - (size.bottom - size.top) - offset.y < space.top
+                : pos.bottom + (size.bottom - size.top) + offset.y > space.bottom) &&
+                above == (space.bottom - pos.bottom > pos.top - space.top))
+                above = !above;
+            let top = above ? pos.top - height - arrowHeight - offset.y : pos.bottom + arrowHeight + offset.y;
+            let right = left + width;
+            if (tView.overlap !== true)
+                for (let r of others)
+                    if (r.left < right && r.right > left && r.top < top + height && r.bottom > top)
+                        top = above ? r.top - height - 2 - arrowHeight : r.bottom + arrowHeight + 2;
+            if (this.position == "absolute") {
+                dom.style.top = (top - measured.parent.top) + "px";
+                dom.style.left = (left - measured.parent.left) + "px";
+            }
+            else {
+                dom.style.top = top + "px";
+                dom.style.left = left + "px";
+            }
+            if (arrow)
+                arrow.style.left = `${pos.left + (ltr ? offset.x : -offset.x) - (left + 14 /* Offset */ - 7 /* Size */)}px`;
+            if (tView.overlap !== true)
+                others.push({ left, top, right, bottom: top + height });
+            dom.classList.toggle("cm-tooltip-above", above);
+            dom.classList.toggle("cm-tooltip-below", !above);
+            if (tView.positioned)
+                tView.positioned();
+        }
+    }
+    maybeMeasure() {
+        if (this.manager.tooltips.length) {
+            if (this.view.inView)
+                this.view.requestMeasure(this.measureReq);
+            if (this.inView != this.view.inView) {
+                this.inView = this.view.inView;
+                if (!this.inView)
+                    for (let tv of this.manager.tooltipViews)
+                        tv.dom.style.top = Outside;
+            }
+        }
+    }
+}, {
+    eventHandlers: {
+        scroll() { this.maybeMeasure(); }
+    }
+});
+const baseTheme$2 = /*@__PURE__*/EditorView.baseTheme({
+    ".cm-tooltip": {
+        zIndex: 100
+    },
+    "&light .cm-tooltip": {
+        border: "1px solid #bbb",
+        backgroundColor: "#f5f5f5"
+    },
+    "&light .cm-tooltip-section:not(:first-child)": {
+        borderTop: "1px solid #bbb",
+    },
+    "&dark .cm-tooltip": {
+        backgroundColor: "#333338",
+        color: "white"
+    },
+    ".cm-tooltip-arrow": {
+        height: `${7 /* Size */}px`,
+        width: `${7 /* Size */ * 2}px`,
+        position: "absolute",
+        zIndex: -1,
+        overflow: "hidden",
+        "&:before, &:after": {
+            content: "''",
+            position: "absolute",
+            width: 0,
+            height: 0,
+            borderLeft: `${7 /* Size */}px solid transparent`,
+            borderRight: `${7 /* Size */}px solid transparent`,
+        },
+        ".cm-tooltip-above &": {
+            bottom: `-${7 /* Size */}px`,
+            "&:before": {
+                borderTop: `${7 /* Size */}px solid #bbb`,
+            },
+            "&:after": {
+                borderTop: `${7 /* Size */}px solid #f5f5f5`,
+                bottom: "1px"
+            }
+        },
+        ".cm-tooltip-below &": {
+            top: `-${7 /* Size */}px`,
+            "&:before": {
+                borderBottom: `${7 /* Size */}px solid #bbb`,
+            },
+            "&:after": {
+                borderBottom: `${7 /* Size */}px solid #f5f5f5`,
+                top: "1px"
+            }
+        },
+    },
+    "&dark .cm-tooltip .cm-tooltip-arrow": {
+        "&:before": {
+            borderTopColor: "#333338",
+            borderBottomColor: "#333338"
+        },
+        "&:after": {
+            borderTopColor: "transparent",
+            borderBottomColor: "transparent"
+        }
+    }
+});
+const noOffset = { x: 0, y: 0 };
+/**
+Facet to which an extension can add a value to show a tooltip.
+*/
+const showTooltip = /*@__PURE__*/Facet.define({
+    enables: [tooltipPlugin, baseTheme$2]
+});
+/**
+Get the active tooltip view for a given tooltip, if available.
+*/
+function getTooltip(view, tooltip) {
+    let plugin = view.plugin(tooltipPlugin);
+    if (!plugin)
+        return null;
+    let found = plugin.manager.tooltips.indexOf(tooltip);
+    return found < 0 ? null : plugin.manager.tooltipViews[found];
+}
 
 /**
 A gutter marker represents a bit of information attached to a line
@@ -11677,6 +12800,44 @@ class NodeType {
 }
 /// An empty dummy node type to use when no actual type is available.
 NodeType.none = new NodeType("", Object.create(null), 0, 8 /* Anonymous */);
+/// A node set holds a collection of node types. It is used to
+/// compactly represent trees by storing their type ids, rather than a
+/// full pointer to the type object, in a numeric array. Each parser
+/// [has](#lr.LRParser.nodeSet) a node set, and [tree
+/// buffers](#common.TreeBuffer) can only store collections of nodes
+/// from the same set. A set can have a maximum of 2**16 (65536) node
+/// types in it, so that the ids fit into 16-bit typed array slots.
+class NodeSet {
+    /// Create a set with the given types. The `id` property of each
+    /// type should correspond to its position within the array.
+    constructor(
+    /// The node types in this set, by id.
+    types) {
+        this.types = types;
+        for (let i = 0; i < types.length; i++)
+            if (types[i].id != i)
+                throw new RangeError("Node type ids should correspond to array positions when creating a node set");
+    }
+    /// Create a copy of this set with some node properties added. The
+    /// arguments to this method can be created with
+    /// [`NodeProp.add`](#common.NodeProp.add).
+    extend(...props) {
+        let newTypes = [];
+        for (let type of this.types) {
+            let newProps = null;
+            for (let source of props) {
+                let add = source(type);
+                if (add) {
+                    if (!newProps)
+                        newProps = Object.assign({}, type.props);
+                    newProps[add[0].id] = add[1];
+                }
+            }
+            newTypes.push(newProps ? new NodeType(type.name, newProps, type.id, type.flags) : type);
+        }
+        return new NodeSet(newTypes);
+    }
+}
 const CachedNode = new WeakMap(), CachedInnerNode = new WeakMap();
 /// Options that control iteration. Can be combined with the `|`
 /// operator to enable multiple ones.
@@ -12721,6 +13882,48 @@ mkTree) {
     divide(children, positions, from, to, 0);
     return (mkTop || mkTree)(localChildren, localPositions, length);
 }
+/// Provides a way to associate values with pieces of trees. As long
+/// as that part of the tree is reused, the associated values can be
+/// retrieved from an updated tree.
+class NodeWeakMap {
+    constructor() {
+        this.map = new WeakMap();
+    }
+    setBuffer(buffer, index, value) {
+        let inner = this.map.get(buffer);
+        if (!inner)
+            this.map.set(buffer, inner = new Map);
+        inner.set(index, value);
+    }
+    getBuffer(buffer, index) {
+        let inner = this.map.get(buffer);
+        return inner && inner.get(index);
+    }
+    /// Set the value for this syntax node.
+    set(node, value) {
+        if (node instanceof BufferNode)
+            this.setBuffer(node.context.buffer, node.index, value);
+        else if (node instanceof TreeNode)
+            this.map.set(node.tree, value);
+    }
+    /// Retrieve value for this syntax node, if it exists in the map.
+    get(node) {
+        return node instanceof BufferNode ? this.getBuffer(node.context.buffer, node.index)
+            : node instanceof TreeNode ? this.map.get(node.tree) : undefined;
+    }
+    /// Set the value for the node that a cursor currently points to.
+    cursorSet(cursor, value) {
+        if (cursor.buffer)
+            this.setBuffer(cursor.buffer.buffer, cursor.index, value);
+        else
+            this.map.set(cursor.tree, value);
+    }
+    /// Retrieve the value for the node that a cursor currently points
+    /// to.
+    cursorGet(cursor) {
+        return cursor.buffer ? this.getBuffer(cursor.buffer.buffer, cursor.index) : this.map.get(cursor.tree);
+    }
+}
 
 /// Tree fragments are used during [incremental
 /// parsing](#common.Parser.startParse) to track parts of old trees
@@ -13497,6 +14700,19 @@ facet that stores language-specific data for that language.
 */
 const languageDataProp = /*@__PURE__*/new NodeProp();
 /**
+Helper function to define a facet (to be added to the top syntax
+node(s) for a language via
+[`languageDataProp`](https://codemirror.net/6/docs/ref/#language.languageDataProp)), that will be
+used to associate language data with the language. You
+probably only need this when subclassing
+[`Language`](https://codemirror.net/6/docs/ref/#language.Language).
+*/
+function defineLanguageFacet(baseData) {
+    return Facet.define({
+        combine: baseData ? values => values.concat(baseData) : undefined
+    });
+}
+/**
 A language object manages parsing and per-language
 [metadata](https://codemirror.net/6/docs/ref/#state.EditorState.languageDataAt). Parse data is
 managed as a [Lezer](https://lezer.codemirror.net) tree. The class
@@ -13600,6 +14816,34 @@ function languageDataFacetAt(state, pos, side) {
             facet = node.type.prop(languageDataProp) || facet;
     }
     return facet;
+}
+/**
+A subclass of [`Language`](https://codemirror.net/6/docs/ref/#language.Language) for use with Lezer
+[LR parsers](https://lezer.codemirror.net/docs/ref#lr.LRParser)
+parsers.
+*/
+class LRLanguage extends Language {
+    constructor(data, parser) {
+        super(data, parser);
+        this.parser = parser;
+    }
+    /**
+    Define a language from a parser.
+    */
+    static define(spec) {
+        let data = defineLanguageFacet(spec.languageData);
+        return new LRLanguage(data, spec.parser.configure({
+            props: [languageDataProp.add(type => type.isTop ? data : undefined)]
+        }));
+    }
+    /**
+    Create a new instance of this language with a reconfigured
+    version of its parser.
+    */
+    configure(options) {
+        return new LRLanguage(this.data, this.parser.configure(options));
+    }
+    get allowsNesting() { return this.parser.hasWrappers(); }
 }
 /**
 Get the syntax tree for a state, which is the current (possibly
@@ -14020,6 +15264,418 @@ const language = /*@__PURE__*/Facet.define({
     combine(languages) { return languages.length ? languages[0] : null; },
     enables: [Language.state, parseWorker]
 });
+/**
+This class bundles a [language](https://codemirror.net/6/docs/ref/#language.Language) with an
+optional set of supporting extensions. Language packages are
+encouraged to export a function that optionally takes a
+configuration object and returns a `LanguageSupport` instance, as
+the main way for client code to use the package.
+*/
+class LanguageSupport {
+    /**
+    Create a language support object.
+    */
+    constructor(
+    /**
+    The language object.
+    */
+    language, 
+    /**
+    An optional set of supporting extensions. When nesting a
+    language in another language, the outer language is encouraged
+    to include the supporting extensions for its inner languages
+    in its own set of support extensions.
+    */
+    support = []) {
+        this.language = language;
+        this.support = support;
+        this.extension = [language, support];
+    }
+}
+
+/**
+Facet that defines a way to provide a function that computes the
+appropriate indentation depth at the start of a given line, or
+`null` to indicate no appropriate indentation could be determined.
+*/
+const indentService = /*@__PURE__*/Facet.define();
+/**
+Facet for overriding the unit by which indentation happens.
+Should be a string consisting either entirely of spaces or
+entirely of tabs. When not set, this defaults to 2 spaces.
+*/
+const indentUnit = /*@__PURE__*/Facet.define({
+    combine: values => {
+        if (!values.length)
+            return "  ";
+        if (!/^(?: +|\t+)$/.test(values[0]))
+            throw new Error("Invalid indent unit: " + JSON.stringify(values[0]));
+        return values[0];
+    }
+});
+/**
+Return the _column width_ of an indent unit in the state.
+Determined by the [`indentUnit`](https://codemirror.net/6/docs/ref/#language.indentUnit)
+facet, and [`tabSize`](https://codemirror.net/6/docs/ref/#state.EditorState^tabSize) when that
+contains tabs.
+*/
+function getIndentUnit(state) {
+    let unit = state.facet(indentUnit);
+    return unit.charCodeAt(0) == 9 ? state.tabSize * unit.length : unit.length;
+}
+/**
+Create an indentation string that covers columns 0 to `cols`.
+Will use tabs for as much of the columns as possible when the
+[`indentUnit`](https://codemirror.net/6/docs/ref/#language.indentUnit) facet contains
+tabs.
+*/
+function indentString(state, cols) {
+    let result = "", ts = state.tabSize;
+    if (state.facet(indentUnit).charCodeAt(0) == 9)
+        while (cols >= ts) {
+            result += "\t";
+            cols -= ts;
+        }
+    for (let i = 0; i < cols; i++)
+        result += " ";
+    return result;
+}
+/**
+Get the indentation at the given position. Will first consult any
+[indent services](https://codemirror.net/6/docs/ref/#language.indentService) that are registered,
+and if none of those return an indentation, this will check the
+syntax tree for the [indent node prop](https://codemirror.net/6/docs/ref/#language.indentNodeProp)
+and use that if found. Returns a number when an indentation could
+be determined, and null otherwise.
+*/
+function getIndentation(context, pos) {
+    if (context instanceof EditorState)
+        context = new IndentContext(context);
+    for (let service of context.state.facet(indentService)) {
+        let result = service(context, pos);
+        if (result != null)
+            return result;
+    }
+    let tree = syntaxTree(context.state);
+    return tree ? syntaxIndentation(context, tree, pos) : null;
+}
+/**
+Indentation contexts are used when calling [indentation
+services](https://codemirror.net/6/docs/ref/#language.indentService). They provide helper utilities
+useful in indentation logic, and can selectively override the
+indentation reported for some lines.
+*/
+class IndentContext {
+    /**
+    Create an indent context.
+    */
+    constructor(
+    /**
+    The editor state.
+    */
+    state, 
+    /**
+    @internal
+    */
+    options = {}) {
+        this.state = state;
+        this.options = options;
+        this.unit = getIndentUnit(state);
+    }
+    /**
+    Get a description of the line at the given position, taking
+    [simulated line
+    breaks](https://codemirror.net/6/docs/ref/#language.IndentContext.constructor^options.simulateBreak)
+    into account. If there is such a break at `pos`, the `bias`
+    argument determines whether the part of the line line before or
+    after the break is used.
+    */
+    lineAt(pos, bias = 1) {
+        let line = this.state.doc.lineAt(pos);
+        let { simulateBreak, simulateDoubleBreak } = this.options;
+        if (simulateBreak != null && simulateBreak >= line.from && simulateBreak <= line.to) {
+            if (simulateDoubleBreak && simulateBreak == pos)
+                return { text: "", from: pos };
+            else if (bias < 0 ? simulateBreak < pos : simulateBreak <= pos)
+                return { text: line.text.slice(simulateBreak - line.from), from: simulateBreak };
+            else
+                return { text: line.text.slice(0, simulateBreak - line.from), from: line.from };
+        }
+        return line;
+    }
+    /**
+    Get the text directly after `pos`, either the entire line
+    or the next 100 characters, whichever is shorter.
+    */
+    textAfterPos(pos, bias = 1) {
+        if (this.options.simulateDoubleBreak && pos == this.options.simulateBreak)
+            return "";
+        let { text, from } = this.lineAt(pos, bias);
+        return text.slice(pos - from, Math.min(text.length, pos + 100 - from));
+    }
+    /**
+    Find the column for the given position.
+    */
+    column(pos, bias = 1) {
+        let { text, from } = this.lineAt(pos, bias);
+        let result = this.countColumn(text, pos - from);
+        let override = this.options.overrideIndentation ? this.options.overrideIndentation(from) : -1;
+        if (override > -1)
+            result += override - this.countColumn(text, text.search(/\S|$/));
+        return result;
+    }
+    /**
+    Find the column position (taking tabs into account) of the given
+    position in the given string.
+    */
+    countColumn(line, pos = line.length) {
+        return countColumn(line, this.state.tabSize, pos);
+    }
+    /**
+    Find the indentation column of the line at the given point.
+    */
+    lineIndent(pos, bias = 1) {
+        let { text, from } = this.lineAt(pos, bias);
+        let override = this.options.overrideIndentation;
+        if (override) {
+            let overriden = override(from);
+            if (overriden > -1)
+                return overriden;
+        }
+        return this.countColumn(text, text.search(/\S|$/));
+    }
+    /**
+    Returns the [simulated line
+    break](https://codemirror.net/6/docs/ref/#language.IndentContext.constructor^options.simulateBreak)
+    for this context, if any.
+    */
+    get simulatedBreak() {
+        return this.options.simulateBreak || null;
+    }
+}
+/**
+A syntax tree node prop used to associate indentation strategies
+with node types. Such a strategy is a function from an indentation
+context to a column number or null, where null indicates that no
+definitive indentation can be determined.
+*/
+const indentNodeProp = /*@__PURE__*/new NodeProp();
+// Compute the indentation for a given position from the syntax tree.
+function syntaxIndentation(cx, ast, pos) {
+    return indentFrom(ast.resolveInner(pos).enterUnfinishedNodesBefore(pos), pos, cx);
+}
+function ignoreClosed(cx) {
+    return cx.pos == cx.options.simulateBreak && cx.options.simulateDoubleBreak;
+}
+function indentStrategy(tree) {
+    let strategy = tree.type.prop(indentNodeProp);
+    if (strategy)
+        return strategy;
+    let first = tree.firstChild, close;
+    if (first && (close = first.type.prop(NodeProp.closedBy))) {
+        let last = tree.lastChild, closed = last && close.indexOf(last.name) > -1;
+        return cx => delimitedStrategy(cx, true, 1, undefined, closed && !ignoreClosed(cx) ? last.from : undefined);
+    }
+    return tree.parent == null ? topIndent : null;
+}
+function indentFrom(node, pos, base) {
+    for (; node; node = node.parent) {
+        let strategy = indentStrategy(node);
+        if (strategy)
+            return strategy(TreeIndentContext.create(base, pos, node));
+    }
+    return null;
+}
+function topIndent() { return 0; }
+/**
+Objects of this type provide context information and helper
+methods to indentation functions registered on syntax nodes.
+*/
+class TreeIndentContext extends IndentContext {
+    constructor(base, 
+    /**
+    The position at which indentation is being computed.
+    */
+    pos, 
+    /**
+    The syntax tree node to which the indentation strategy
+    applies.
+    */
+    node) {
+        super(base.state, base.options);
+        this.base = base;
+        this.pos = pos;
+        this.node = node;
+    }
+    /**
+    @internal
+    */
+    static create(base, pos, node) {
+        return new TreeIndentContext(base, pos, node);
+    }
+    /**
+    Get the text directly after `this.pos`, either the entire line
+    or the next 100 characters, whichever is shorter.
+    */
+    get textAfter() {
+        return this.textAfterPos(this.pos);
+    }
+    /**
+    Get the indentation at the reference line for `this.node`, which
+    is the line on which it starts, unless there is a node that is
+    _not_ a parent of this node covering the start of that line. If
+    so, the line at the start of that node is tried, again skipping
+    on if it is covered by another such node.
+    */
+    get baseIndent() {
+        let line = this.state.doc.lineAt(this.node.from);
+        // Skip line starts that are covered by a sibling (or cousin, etc)
+        for (;;) {
+            let atBreak = this.node.resolve(line.from);
+            while (atBreak.parent && atBreak.parent.from == atBreak.from)
+                atBreak = atBreak.parent;
+            if (isParent(atBreak, this.node))
+                break;
+            line = this.state.doc.lineAt(atBreak.from);
+        }
+        return this.lineIndent(line.from);
+    }
+    /**
+    Continue looking for indentations in the node's parent nodes,
+    and return the result of that.
+    */
+    continue() {
+        let parent = this.node.parent;
+        return parent ? indentFrom(parent, this.pos, this.base) : 0;
+    }
+}
+function isParent(parent, of) {
+    for (let cur = of; cur; cur = cur.parent)
+        if (parent == cur)
+            return true;
+    return false;
+}
+// Check whether a delimited node is aligned (meaning there are
+// non-skipped nodes on the same line as the opening delimiter). And
+// if so, return the opening token.
+function bracketedAligned(context) {
+    let tree = context.node;
+    let openToken = tree.childAfter(tree.from), last = tree.lastChild;
+    if (!openToken)
+        return null;
+    let sim = context.options.simulateBreak;
+    let openLine = context.state.doc.lineAt(openToken.from);
+    let lineEnd = sim == null || sim <= openLine.from ? openLine.to : Math.min(openLine.to, sim);
+    for (let pos = openToken.to;;) {
+        let next = tree.childAfter(pos);
+        if (!next || next == last)
+            return null;
+        if (!next.type.isSkipped)
+            return next.from < lineEnd ? openToken : null;
+        pos = next.to;
+    }
+}
+/**
+An indentation strategy for delimited (usually bracketed) nodes.
+Will, by default, indent one unit more than the parent's base
+indent unless the line starts with a closing token. When `align`
+is true and there are non-skipped nodes on the node's opening
+line, the content of the node will be aligned with the end of the
+opening node, like this:
+
+    foo(bar,
+        baz)
+*/
+function delimitedIndent({ closing, align = true, units = 1 }) {
+    return (context) => delimitedStrategy(context, align, units, closing);
+}
+function delimitedStrategy(context, align, units, closing, closedAt) {
+    let after = context.textAfter, space = after.match(/^\s*/)[0].length;
+    let closed = closing && after.slice(space, space + closing.length) == closing || closedAt == context.pos + space;
+    let aligned = align ? bracketedAligned(context) : null;
+    if (aligned)
+        return closed ? context.column(aligned.from) : context.column(aligned.to);
+    return context.baseIndent + (closed ? 0 : context.unit * units);
+}
+/**
+An indentation strategy that aligns a node's content to its base
+indentation.
+*/
+const flatIndent = (context) => context.baseIndent;
+/**
+Creates an indentation strategy that, by default, indents
+continued lines one unit more than the node's base indentation.
+You can provide `except` to prevent indentation of lines that
+match a pattern (for example `/^else\b/` in `if`/`else`
+constructs), and you can change the amount of units used with the
+`units` option.
+*/
+function continuedIndent({ except, units = 1 } = {}) {
+    return (context) => {
+        let matchExcept = except && except.test(context.textAfter);
+        return context.baseIndent + (matchExcept ? 0 : units * context.unit);
+    };
+}
+const DontIndentBeyond = 200;
+/**
+Enables reindentation on input. When a language defines an
+`indentOnInput` field in its [language
+data](https://codemirror.net/6/docs/ref/#state.EditorState.languageDataAt), which must hold a regular
+expression, the line at the cursor will be reindented whenever new
+text is typed and the input from the start of the line up to the
+cursor matches that regexp.
+
+To avoid unneccesary reindents, it is recommended to start the
+regexp with `^` (usually followed by `\s*`), and end it with `$`.
+For example, `/^\s*\}$/` will reindent when a closing brace is
+added at the start of a line.
+*/
+function indentOnInput() {
+    return EditorState.transactionFilter.of(tr => {
+        if (!tr.docChanged || !tr.isUserEvent("input.type") && !tr.isUserEvent("input.complete"))
+            return tr;
+        let rules = tr.startState.languageDataAt("indentOnInput", tr.startState.selection.main.head);
+        if (!rules.length)
+            return tr;
+        let doc = tr.newDoc, { head } = tr.newSelection.main, line = doc.lineAt(head);
+        if (head > line.from + DontIndentBeyond)
+            return tr;
+        let lineStart = doc.sliceString(line.from, head);
+        if (!rules.some(r => r.test(lineStart)))
+            return tr;
+        let { state } = tr, last = -1, changes = [];
+        for (let { head } of state.selection.ranges) {
+            let line = state.doc.lineAt(head);
+            if (line.from == last)
+                continue;
+            last = line.from;
+            let indent = getIndentation(state, line.from);
+            if (indent == null)
+                continue;
+            let cur = /^\s*/.exec(line.text)[0];
+            let norm = indentString(state, indent);
+            if (cur != norm)
+                changes.push({ from: line.from, to: line.from + cur.length, insert: norm });
+        }
+        return changes.length ? [tr, { changes, sequential: true }] : tr;
+    });
+}
+/**
+This node prop is used to associate folding information with
+syntax node types. Given a syntax node, it should check whether
+that tree is foldable and return the range that can be collapsed
+when it is.
+*/
+const foldNodeProp = /*@__PURE__*/new NodeProp();
+/**
+[Fold](https://codemirror.net/6/docs/ref/#language.foldNodeProp) function that folds everything but
+the first and the last child of a syntax node. Useful for nodes
+that start and end with delimiters.
+*/
+function foldInside(node) {
+    let first = node.firstChild, last = node.lastChild;
+    return first && first.to < last.from ? { from: first.to, to: last.type.isError ? node.to : last.from } : null;
+}
 
 /**
 A highlight style associates CSS styles with higlighting
@@ -14129,6 +15785,193 @@ class TreeHighlighter {
 const treeHighlighter = /*@__PURE__*/Prec.high(/*@__PURE__*/ViewPlugin.fromClass(TreeHighlighter, {
     decorations: v => v.decorations
 }));
+/**
+A default highlight style (works well with light themes).
+*/
+const defaultHighlightStyle = /*@__PURE__*/HighlightStyle.define([
+    { tag: tags.meta,
+        color: "#7a757a" },
+    { tag: tags.link,
+        textDecoration: "underline" },
+    { tag: tags.heading,
+        textDecoration: "underline",
+        fontWeight: "bold" },
+    { tag: tags.emphasis,
+        fontStyle: "italic" },
+    { tag: tags.strong,
+        fontWeight: "bold" },
+    { tag: tags.strikethrough,
+        textDecoration: "line-through" },
+    { tag: tags.keyword,
+        color: "#708" },
+    { tag: [tags.atom, tags.bool, tags.url, tags.contentSeparator, tags.labelName],
+        color: "#219" },
+    { tag: [tags.literal, tags.inserted],
+        color: "#164" },
+    { tag: [tags.string, tags.deleted],
+        color: "#a11" },
+    { tag: [tags.regexp, tags.escape, /*@__PURE__*/tags.special(tags.string)],
+        color: "#e40" },
+    { tag: /*@__PURE__*/tags.definition(tags.variableName),
+        color: "#00f" },
+    { tag: /*@__PURE__*/tags.local(tags.variableName),
+        color: "#30a" },
+    { tag: [tags.typeName, tags.namespace],
+        color: "#085" },
+    { tag: tags.className,
+        color: "#167" },
+    { tag: [/*@__PURE__*/tags.special(tags.variableName), tags.macroName],
+        color: "#256" },
+    { tag: /*@__PURE__*/tags.definition(tags.propertyName),
+        color: "#00c" },
+    { tag: tags.comment,
+        color: "#940" },
+    { tag: tags.invalid,
+        color: "#f00" }
+]);
+
+const baseTheme$1 = /*@__PURE__*/EditorView.baseTheme({
+    "&.cm-focused .cm-matchingBracket": { backgroundColor: "#328c8252" },
+    "&.cm-focused .cm-nonmatchingBracket": { backgroundColor: "#bb555544" }
+});
+const DefaultScanDist = 10000, DefaultBrackets = "()[]{}";
+const bracketMatchingConfig = /*@__PURE__*/Facet.define({
+    combine(configs) {
+        return combineConfig(configs, {
+            afterCursor: true,
+            brackets: DefaultBrackets,
+            maxScanDistance: DefaultScanDist,
+            renderMatch: defaultRenderMatch
+        });
+    }
+});
+const matchingMark = /*@__PURE__*/Decoration.mark({ class: "cm-matchingBracket" }), nonmatchingMark = /*@__PURE__*/Decoration.mark({ class: "cm-nonmatchingBracket" });
+function defaultRenderMatch(match) {
+    let decorations = [];
+    let mark = match.matched ? matchingMark : nonmatchingMark;
+    decorations.push(mark.range(match.start.from, match.start.to));
+    if (match.end)
+        decorations.push(mark.range(match.end.from, match.end.to));
+    return decorations;
+}
+const bracketMatchingState = /*@__PURE__*/StateField.define({
+    create() { return Decoration.none; },
+    update(deco, tr) {
+        if (!tr.docChanged && !tr.selection)
+            return deco;
+        let decorations = [];
+        let config = tr.state.facet(bracketMatchingConfig);
+        for (let range of tr.state.selection.ranges) {
+            if (!range.empty)
+                continue;
+            let match = matchBrackets(tr.state, range.head, -1, config)
+                || (range.head > 0 && matchBrackets(tr.state, range.head - 1, 1, config))
+                || (config.afterCursor &&
+                    (matchBrackets(tr.state, range.head, 1, config) ||
+                        (range.head < tr.state.doc.length && matchBrackets(tr.state, range.head + 1, -1, config))));
+            if (match)
+                decorations = decorations.concat(config.renderMatch(match, tr.state));
+        }
+        return Decoration.set(decorations, true);
+    },
+    provide: f => EditorView.decorations.from(f)
+});
+const bracketMatchingUnique = [
+    bracketMatchingState,
+    baseTheme$1
+];
+/**
+Create an extension that enables bracket matching. Whenever the
+cursor is next to a bracket, that bracket and the one it matches
+are highlighted. Or, when no matching bracket is found, another
+highlighting style is used to indicate this.
+*/
+function bracketMatching(config = {}) {
+    return [bracketMatchingConfig.of(config), bracketMatchingUnique];
+}
+function matchingNodes(node, dir, brackets) {
+    let byProp = node.prop(dir < 0 ? NodeProp.openedBy : NodeProp.closedBy);
+    if (byProp)
+        return byProp;
+    if (node.name.length == 1) {
+        let index = brackets.indexOf(node.name);
+        if (index > -1 && index % 2 == (dir < 0 ? 1 : 0))
+            return [brackets[index + dir]];
+    }
+    return null;
+}
+/**
+Find the matching bracket for the token at `pos`, scanning
+direction `dir`. Only the `brackets` and `maxScanDistance`
+properties are used from `config`, if given. Returns null if no
+bracket was found at `pos`, or a match result otherwise.
+*/
+function matchBrackets(state, pos, dir, config = {}) {
+    let maxScanDistance = config.maxScanDistance || DefaultScanDist, brackets = config.brackets || DefaultBrackets;
+    let tree = syntaxTree(state), node = tree.resolveInner(pos, dir);
+    for (let cur = node; cur; cur = cur.parent) {
+        let matches = matchingNodes(cur.type, dir, brackets);
+        if (matches && cur.from < cur.to)
+            return matchMarkedBrackets(state, pos, dir, cur, matches, brackets);
+    }
+    return matchPlainBrackets(state, pos, dir, tree, node.type, maxScanDistance, brackets);
+}
+function matchMarkedBrackets(_state, _pos, dir, token, matching, brackets) {
+    let parent = token.parent, firstToken = { from: token.from, to: token.to };
+    let depth = 0, cursor = parent === null || parent === void 0 ? void 0 : parent.cursor();
+    if (cursor && (dir < 0 ? cursor.childBefore(token.from) : cursor.childAfter(token.to)))
+        do {
+            if (dir < 0 ? cursor.to <= token.from : cursor.from >= token.to) {
+                if (depth == 0 && matching.indexOf(cursor.type.name) > -1 && cursor.from < cursor.to) {
+                    return { start: firstToken, end: { from: cursor.from, to: cursor.to }, matched: true };
+                }
+                else if (matchingNodes(cursor.type, dir, brackets)) {
+                    depth++;
+                }
+                else if (matchingNodes(cursor.type, -dir, brackets)) {
+                    if (depth == 0)
+                        return {
+                            start: firstToken,
+                            end: cursor.from == cursor.to ? undefined : { from: cursor.from, to: cursor.to },
+                            matched: false
+                        };
+                    depth--;
+                }
+            }
+        } while (dir < 0 ? cursor.prevSibling() : cursor.nextSibling());
+    return { start: firstToken, matched: false };
+}
+function matchPlainBrackets(state, pos, dir, tree, tokenType, maxScanDistance, brackets) {
+    let startCh = dir < 0 ? state.sliceDoc(pos - 1, pos) : state.sliceDoc(pos, pos + 1);
+    let bracket = brackets.indexOf(startCh);
+    if (bracket < 0 || (bracket % 2 == 0) != (dir > 0))
+        return null;
+    let startToken = { from: dir < 0 ? pos - 1 : pos, to: dir > 0 ? pos + 1 : pos };
+    let iter = state.doc.iterRange(pos, dir > 0 ? state.doc.length : 0), depth = 0;
+    for (let distance = 0; !(iter.next()).done && distance <= maxScanDistance;) {
+        let text = iter.value;
+        if (dir < 0)
+            distance += text.length;
+        let basePos = pos + distance * dir;
+        for (let pos = dir > 0 ? 0 : text.length - 1, end = dir > 0 ? text.length : -1; pos != end; pos += dir) {
+            let found = brackets.indexOf(text[pos]);
+            if (found < 0 || tree.resolveInner(basePos + pos, 1).type != tokenType)
+                continue;
+            if ((found % 2 == 0) == (dir > 0)) {
+                depth++;
+            }
+            else if (depth == 1) { // Closing
+                return { start: startToken, end: { from: basePos + pos, to: basePos + pos + 1 }, matched: (found >> 1) == (bracket >> 1) };
+            }
+            else {
+                depth--;
+            }
+        }
+        if (dir > 0)
+            distance += text.length;
+    }
+    return iter.done ? { start: startToken, matched: false } : null;
+}
 const noTokens = /*@__PURE__*/Object.create(null);
 const typeArray = [NodeType.none];
 const warned = [];
@@ -14184,6 +16027,5274 @@ function createTokenType(extra, tagStr) {
     typeArray.push(type);
     return type.id;
 }
+
+/**
+Comment or uncomment the current selection. Will use line comments
+if available, otherwise falling back to block comments.
+*/
+const toggleComment = target => {
+    let config = getConfig(target.state);
+    return config.line ? toggleLineComment(target) : config.block ? toggleBlockCommentByLine(target) : false;
+};
+function command(f, option) {
+    return ({ state, dispatch }) => {
+        if (state.readOnly)
+            return false;
+        let tr = f(option, state);
+        if (!tr)
+            return false;
+        dispatch(state.update(tr));
+        return true;
+    };
+}
+/**
+Comment or uncomment the current selection using line comments.
+The line comment syntax is taken from the
+[`commentTokens`](https://codemirror.net/6/docs/ref/#commands.CommentTokens) [language
+data](https://codemirror.net/6/docs/ref/#state.EditorState.languageDataAt).
+*/
+const toggleLineComment = /*@__PURE__*/command(changeLineComment, 0 /* Toggle */);
+/**
+Comment or uncomment the current selection using block comments.
+The block comment syntax is taken from the
+[`commentTokens`](https://codemirror.net/6/docs/ref/#commands.CommentTokens) [language
+data](https://codemirror.net/6/docs/ref/#state.EditorState.languageDataAt).
+*/
+const toggleBlockComment = /*@__PURE__*/command(changeBlockComment, 0 /* Toggle */);
+/**
+Comment or uncomment the lines around the current selection using
+block comments.
+*/
+const toggleBlockCommentByLine = /*@__PURE__*/command((o, s) => changeBlockComment(o, s, selectedLineRanges(s)), 0 /* Toggle */);
+function getConfig(state, pos = state.selection.main.head) {
+    let data = state.languageDataAt("commentTokens", pos);
+    return data.length ? data[0] : {};
+}
+const SearchMargin = 50;
+/**
+Determines if the given range is block-commented in the given
+state.
+*/
+function findBlockComment(state, { open, close }, from, to) {
+    let textBefore = state.sliceDoc(from - SearchMargin, from);
+    let textAfter = state.sliceDoc(to, to + SearchMargin);
+    let spaceBefore = /\s*$/.exec(textBefore)[0].length, spaceAfter = /^\s*/.exec(textAfter)[0].length;
+    let beforeOff = textBefore.length - spaceBefore;
+    if (textBefore.slice(beforeOff - open.length, beforeOff) == open &&
+        textAfter.slice(spaceAfter, spaceAfter + close.length) == close) {
+        return { open: { pos: from - spaceBefore, margin: spaceBefore && 1 },
+            close: { pos: to + spaceAfter, margin: spaceAfter && 1 } };
+    }
+    let startText, endText;
+    if (to - from <= 2 * SearchMargin) {
+        startText = endText = state.sliceDoc(from, to);
+    }
+    else {
+        startText = state.sliceDoc(from, from + SearchMargin);
+        endText = state.sliceDoc(to - SearchMargin, to);
+    }
+    let startSpace = /^\s*/.exec(startText)[0].length, endSpace = /\s*$/.exec(endText)[0].length;
+    let endOff = endText.length - endSpace - close.length;
+    if (startText.slice(startSpace, startSpace + open.length) == open &&
+        endText.slice(endOff, endOff + close.length) == close) {
+        return { open: { pos: from + startSpace + open.length,
+                margin: /\s/.test(startText.charAt(startSpace + open.length)) ? 1 : 0 },
+            close: { pos: to - endSpace - close.length,
+                margin: /\s/.test(endText.charAt(endOff - 1)) ? 1 : 0 } };
+    }
+    return null;
+}
+function selectedLineRanges(state) {
+    let ranges = [];
+    for (let r of state.selection.ranges) {
+        let fromLine = state.doc.lineAt(r.from);
+        let toLine = r.to <= fromLine.to ? fromLine : state.doc.lineAt(r.to);
+        let last = ranges.length - 1;
+        if (last >= 0 && ranges[last].to > fromLine.from)
+            ranges[last].to = toLine.to;
+        else
+            ranges.push({ from: fromLine.from, to: toLine.to });
+    }
+    return ranges;
+}
+// Performs toggle, comment and uncomment of block comments in
+// languages that support them.
+function changeBlockComment(option, state, ranges = state.selection.ranges) {
+    let tokens = ranges.map(r => getConfig(state, r.from).block);
+    if (!tokens.every(c => c))
+        return null;
+    let comments = ranges.map((r, i) => findBlockComment(state, tokens[i], r.from, r.to));
+    if (option != 2 /* Uncomment */ && !comments.every(c => c)) {
+        return { changes: state.changes(ranges.map((range, i) => {
+                if (comments[i])
+                    return [];
+                return [{ from: range.from, insert: tokens[i].open + " " }, { from: range.to, insert: " " + tokens[i].close }];
+            })) };
+    }
+    else if (option != 1 /* Comment */ && comments.some(c => c)) {
+        let changes = [];
+        for (let i = 0, comment; i < comments.length; i++)
+            if (comment = comments[i]) {
+                let token = tokens[i], { open, close } = comment;
+                changes.push({ from: open.pos - token.open.length, to: open.pos + open.margin }, { from: close.pos - close.margin, to: close.pos + token.close.length });
+            }
+        return { changes };
+    }
+    return null;
+}
+// Performs toggle, comment and uncomment of line comments.
+function changeLineComment(option, state, ranges = state.selection.ranges) {
+    let lines = [];
+    let prevLine = -1;
+    for (let { from, to } of ranges) {
+        let startI = lines.length, minIndent = 1e9;
+        for (let pos = from; pos <= to;) {
+            let line = state.doc.lineAt(pos);
+            if (line.from > prevLine && (from == to || to > line.from)) {
+                prevLine = line.from;
+                let token = getConfig(state, pos).line;
+                if (!token)
+                    continue;
+                let indent = /^\s*/.exec(line.text)[0].length;
+                let empty = indent == line.length;
+                let comment = line.text.slice(indent, indent + token.length) == token ? indent : -1;
+                if (indent < line.text.length && indent < minIndent)
+                    minIndent = indent;
+                lines.push({ line, comment, token, indent, empty, single: false });
+            }
+            pos = line.to + 1;
+        }
+        if (minIndent < 1e9)
+            for (let i = startI; i < lines.length; i++)
+                if (lines[i].indent < lines[i].line.text.length)
+                    lines[i].indent = minIndent;
+        if (lines.length == startI + 1)
+            lines[startI].single = true;
+    }
+    if (option != 2 /* Uncomment */ && lines.some(l => l.comment < 0 && (!l.empty || l.single))) {
+        let changes = [];
+        for (let { line, token, indent, empty, single } of lines)
+            if (single || !empty)
+                changes.push({ from: line.from + indent, insert: token + " " });
+        let changeSet = state.changes(changes);
+        return { changes: changeSet, selection: state.selection.map(changeSet, 1) };
+    }
+    else if (option != 1 /* Comment */ && lines.some(l => l.comment >= 0)) {
+        let changes = [];
+        for (let { line, comment, token } of lines)
+            if (comment >= 0) {
+                let from = line.from + comment, to = from + token.length;
+                if (line.text[to - line.from] == " ")
+                    to++;
+                changes.push({ from, to });
+            }
+        return { changes };
+    }
+    return null;
+}
+
+const fromHistory = /*@__PURE__*/Annotation.define();
+/**
+Transaction annotation that will prevent that transaction from
+being combined with other transactions in the undo history. Given
+`"before"`, it'll prevent merging with previous transactions. With
+`"after"`, subsequent transactions won't be combined with this
+one. With `"full"`, the transaction is isolated on both sides.
+*/
+const isolateHistory = /*@__PURE__*/Annotation.define();
+/**
+This facet provides a way to register functions that, given a
+transaction, provide a set of effects that the history should
+store when inverting the transaction. This can be used to
+integrate some kinds of effects in the history, so that they can
+be undone (and redone again).
+*/
+const invertedEffects = /*@__PURE__*/Facet.define();
+const historyConfig = /*@__PURE__*/Facet.define({
+    combine(configs) {
+        return combineConfig(configs, {
+            minDepth: 100,
+            newGroupDelay: 500
+        }, { minDepth: Math.max, newGroupDelay: Math.min });
+    }
+});
+function changeEnd(changes) {
+    let end = 0;
+    changes.iterChangedRanges((_, to) => end = to);
+    return end;
+}
+const historyField_ = /*@__PURE__*/StateField.define({
+    create() {
+        return HistoryState.empty;
+    },
+    update(state, tr) {
+        let config = tr.state.facet(historyConfig);
+        let fromHist = tr.annotation(fromHistory);
+        if (fromHist) {
+            let selection = tr.docChanged ? EditorSelection.single(changeEnd(tr.changes)) : undefined;
+            let item = HistEvent.fromTransaction(tr, selection), from = fromHist.side;
+            let other = from == 0 /* Done */ ? state.undone : state.done;
+            if (item)
+                other = updateBranch(other, other.length, config.minDepth, item);
+            else
+                other = addSelection(other, tr.startState.selection);
+            return new HistoryState(from == 0 /* Done */ ? fromHist.rest : other, from == 0 /* Done */ ? other : fromHist.rest);
+        }
+        let isolate = tr.annotation(isolateHistory);
+        if (isolate == "full" || isolate == "before")
+            state = state.isolate();
+        if (tr.annotation(Transaction.addToHistory) === false)
+            return !tr.changes.empty ? state.addMapping(tr.changes.desc) : state;
+        let event = HistEvent.fromTransaction(tr);
+        let time = tr.annotation(Transaction.time), userEvent = tr.annotation(Transaction.userEvent);
+        if (event)
+            state = state.addChanges(event, time, userEvent, config.newGroupDelay, config.minDepth);
+        else if (tr.selection)
+            state = state.addSelection(tr.startState.selection, time, userEvent, config.newGroupDelay);
+        if (isolate == "full" || isolate == "after")
+            state = state.isolate();
+        return state;
+    },
+    toJSON(value) {
+        return { done: value.done.map(e => e.toJSON()), undone: value.undone.map(e => e.toJSON()) };
+    },
+    fromJSON(json) {
+        return new HistoryState(json.done.map(HistEvent.fromJSON), json.undone.map(HistEvent.fromJSON));
+    }
+});
+/**
+Create a history extension with the given configuration.
+*/
+function history(config = {}) {
+    return [
+        historyField_,
+        historyConfig.of(config),
+        EditorView.domEventHandlers({
+            beforeinput(e, view) {
+                let command = e.inputType == "historyUndo" ? undo : e.inputType == "historyRedo" ? redo : null;
+                if (!command)
+                    return false;
+                e.preventDefault();
+                return command(view);
+            }
+        })
+    ];
+}
+function cmd(side, selection) {
+    return function ({ state, dispatch }) {
+        if (!selection && state.readOnly)
+            return false;
+        let historyState = state.field(historyField_, false);
+        if (!historyState)
+            return false;
+        let tr = historyState.pop(side, state, selection);
+        if (!tr)
+            return false;
+        dispatch(tr);
+        return true;
+    };
+}
+/**
+Undo a single group of history events. Returns false if no group
+was available.
+*/
+const undo = /*@__PURE__*/cmd(0 /* Done */, false);
+/**
+Redo a group of history events. Returns false if no group was
+available.
+*/
+const redo = /*@__PURE__*/cmd(1 /* Undone */, false);
+/**
+Undo a change or selection change.
+*/
+const undoSelection = /*@__PURE__*/cmd(0 /* Done */, true);
+/**
+Redo a change or selection change.
+*/
+const redoSelection = /*@__PURE__*/cmd(1 /* Undone */, true);
+// History events store groups of changes or effects that need to be
+// undone/redone together.
+class HistEvent {
+    constructor(
+    // The changes in this event. Normal events hold at least one
+    // change or effect. But it may be necessary to store selection
+    // events before the first change, in which case a special type of
+    // instance is created which doesn't hold any changes, with
+    // changes == startSelection == undefined
+    changes, 
+    // The effects associated with this event
+    effects, 
+    // Accumulated mapping (from addToHistory==false) that should be
+    // applied to events below this one.
+    mapped, 
+    // The selection before this event
+    startSelection, 
+    // Stores selection changes after this event, to be used for
+    // selection undo/redo.
+    selectionsAfter) {
+        this.changes = changes;
+        this.effects = effects;
+        this.mapped = mapped;
+        this.startSelection = startSelection;
+        this.selectionsAfter = selectionsAfter;
+    }
+    setSelAfter(after) {
+        return new HistEvent(this.changes, this.effects, this.mapped, this.startSelection, after);
+    }
+    toJSON() {
+        var _a, _b, _c;
+        return {
+            changes: (_a = this.changes) === null || _a === void 0 ? void 0 : _a.toJSON(),
+            mapped: (_b = this.mapped) === null || _b === void 0 ? void 0 : _b.toJSON(),
+            startSelection: (_c = this.startSelection) === null || _c === void 0 ? void 0 : _c.toJSON(),
+            selectionsAfter: this.selectionsAfter.map(s => s.toJSON())
+        };
+    }
+    static fromJSON(json) {
+        return new HistEvent(json.changes && ChangeSet.fromJSON(json.changes), [], json.mapped && ChangeDesc.fromJSON(json.mapped), json.startSelection && EditorSelection.fromJSON(json.startSelection), json.selectionsAfter.map(EditorSelection.fromJSON));
+    }
+    // This does not check `addToHistory` and such, it assumes the
+    // transaction needs to be converted to an item. Returns null when
+    // there are no changes or effects in the transaction.
+    static fromTransaction(tr, selection) {
+        let effects = none$1;
+        for (let invert of tr.startState.facet(invertedEffects)) {
+            let result = invert(tr);
+            if (result.length)
+                effects = effects.concat(result);
+        }
+        if (!effects.length && tr.changes.empty)
+            return null;
+        return new HistEvent(tr.changes.invert(tr.startState.doc), effects, undefined, selection || tr.startState.selection, none$1);
+    }
+    static selection(selections) {
+        return new HistEvent(undefined, none$1, undefined, undefined, selections);
+    }
+}
+function updateBranch(branch, to, maxLen, newEvent) {
+    let start = to + 1 > maxLen + 20 ? to - maxLen - 1 : 0;
+    let newBranch = branch.slice(start, to);
+    newBranch.push(newEvent);
+    return newBranch;
+}
+function isAdjacent(a, b) {
+    let ranges = [], isAdjacent = false;
+    a.iterChangedRanges((f, t) => ranges.push(f, t));
+    b.iterChangedRanges((_f, _t, f, t) => {
+        for (let i = 0; i < ranges.length;) {
+            let from = ranges[i++], to = ranges[i++];
+            if (t >= from && f <= to)
+                isAdjacent = true;
+        }
+    });
+    return isAdjacent;
+}
+function eqSelectionShape(a, b) {
+    return a.ranges.length == b.ranges.length &&
+        a.ranges.filter((r, i) => r.empty != b.ranges[i].empty).length === 0;
+}
+function conc(a, b) {
+    return !a.length ? b : !b.length ? a : a.concat(b);
+}
+const none$1 = [];
+const MaxSelectionsPerEvent = 200;
+function addSelection(branch, selection) {
+    if (!branch.length) {
+        return [HistEvent.selection([selection])];
+    }
+    else {
+        let lastEvent = branch[branch.length - 1];
+        let sels = lastEvent.selectionsAfter.slice(Math.max(0, lastEvent.selectionsAfter.length - MaxSelectionsPerEvent));
+        if (sels.length && sels[sels.length - 1].eq(selection))
+            return branch;
+        sels.push(selection);
+        return updateBranch(branch, branch.length - 1, 1e9, lastEvent.setSelAfter(sels));
+    }
+}
+// Assumes the top item has one or more selectionAfter values
+function popSelection(branch) {
+    let last = branch[branch.length - 1];
+    let newBranch = branch.slice();
+    newBranch[branch.length - 1] = last.setSelAfter(last.selectionsAfter.slice(0, last.selectionsAfter.length - 1));
+    return newBranch;
+}
+// Add a mapping to the top event in the given branch. If this maps
+// away all the changes and effects in that item, drop it and
+// propagate the mapping to the next item.
+function addMappingToBranch(branch, mapping) {
+    if (!branch.length)
+        return branch;
+    let length = branch.length, selections = none$1;
+    while (length) {
+        let event = mapEvent(branch[length - 1], mapping, selections);
+        if (event.changes && !event.changes.empty || event.effects.length) { // Event survived mapping
+            let result = branch.slice(0, length);
+            result[length - 1] = event;
+            return result;
+        }
+        else { // Drop this event, since there's no changes or effects left
+            mapping = event.mapped;
+            length--;
+            selections = event.selectionsAfter;
+        }
+    }
+    return selections.length ? [HistEvent.selection(selections)] : none$1;
+}
+function mapEvent(event, mapping, extraSelections) {
+    let selections = conc(event.selectionsAfter.length ? event.selectionsAfter.map(s => s.map(mapping)) : none$1, extraSelections);
+    // Change-less events don't store mappings (they are always the last event in a branch)
+    if (!event.changes)
+        return HistEvent.selection(selections);
+    let mappedChanges = event.changes.map(mapping), before = mapping.mapDesc(event.changes, true);
+    let fullMapping = event.mapped ? event.mapped.composeDesc(before) : before;
+    return new HistEvent(mappedChanges, StateEffect.mapEffects(event.effects, mapping), fullMapping, event.startSelection.map(before), selections);
+}
+const joinableUserEvent = /^(input\.type|delete)($|\.)/;
+class HistoryState {
+    constructor(done, undone, prevTime = 0, prevUserEvent = undefined) {
+        this.done = done;
+        this.undone = undone;
+        this.prevTime = prevTime;
+        this.prevUserEvent = prevUserEvent;
+    }
+    isolate() {
+        return this.prevTime ? new HistoryState(this.done, this.undone) : this;
+    }
+    addChanges(event, time, userEvent, newGroupDelay, maxLen) {
+        let done = this.done, lastEvent = done[done.length - 1];
+        if (lastEvent && lastEvent.changes && !lastEvent.changes.empty && event.changes &&
+            (!userEvent || joinableUserEvent.test(userEvent)) &&
+            ((!lastEvent.selectionsAfter.length &&
+                time - this.prevTime < newGroupDelay &&
+                isAdjacent(lastEvent.changes, event.changes)) ||
+                // For compose (but not compose.start) events, always join with previous event
+                userEvent == "input.type.compose")) {
+            done = updateBranch(done, done.length - 1, maxLen, new HistEvent(event.changes.compose(lastEvent.changes), conc(event.effects, lastEvent.effects), lastEvent.mapped, lastEvent.startSelection, none$1));
+        }
+        else {
+            done = updateBranch(done, done.length, maxLen, event);
+        }
+        return new HistoryState(done, none$1, time, userEvent);
+    }
+    addSelection(selection, time, userEvent, newGroupDelay) {
+        let last = this.done.length ? this.done[this.done.length - 1].selectionsAfter : none$1;
+        if (last.length > 0 &&
+            time - this.prevTime < newGroupDelay &&
+            userEvent == this.prevUserEvent && userEvent && /^select($|\.)/.test(userEvent) &&
+            eqSelectionShape(last[last.length - 1], selection))
+            return this;
+        return new HistoryState(addSelection(this.done, selection), this.undone, time, userEvent);
+    }
+    addMapping(mapping) {
+        return new HistoryState(addMappingToBranch(this.done, mapping), addMappingToBranch(this.undone, mapping), this.prevTime, this.prevUserEvent);
+    }
+    pop(side, state, selection) {
+        let branch = side == 0 /* Done */ ? this.done : this.undone;
+        if (branch.length == 0)
+            return null;
+        let event = branch[branch.length - 1];
+        if (selection && event.selectionsAfter.length) {
+            return state.update({
+                selection: event.selectionsAfter[event.selectionsAfter.length - 1],
+                annotations: fromHistory.of({ side, rest: popSelection(branch) }),
+                userEvent: side == 0 /* Done */ ? "select.undo" : "select.redo",
+                scrollIntoView: true
+            });
+        }
+        else if (!event.changes) {
+            return null;
+        }
+        else {
+            let rest = branch.length == 1 ? none$1 : branch.slice(0, branch.length - 1);
+            if (event.mapped)
+                rest = addMappingToBranch(rest, event.mapped);
+            return state.update({
+                changes: event.changes,
+                selection: event.startSelection,
+                effects: event.effects,
+                annotations: fromHistory.of({ side, rest }),
+                filter: false,
+                userEvent: side == 0 /* Done */ ? "undo" : "redo",
+                scrollIntoView: true
+            });
+        }
+    }
+}
+HistoryState.empty = /*@__PURE__*/new HistoryState(none$1, none$1);
+/**
+Default key bindings for the undo history.
+
+- Mod-z: [`undo`](https://codemirror.net/6/docs/ref/#commands.undo).
+- Mod-y (Mod-Shift-z on macOS) + Ctrl-Shift-z on Linux: [`redo`](https://codemirror.net/6/docs/ref/#commands.redo).
+- Mod-u: [`undoSelection`](https://codemirror.net/6/docs/ref/#commands.undoSelection).
+- Alt-u (Mod-Shift-u on macOS): [`redoSelection`](https://codemirror.net/6/docs/ref/#commands.redoSelection).
+*/
+const historyKeymap = [
+    { key: "Mod-z", run: undo, preventDefault: true },
+    { key: "Mod-y", mac: "Mod-Shift-z", run: redo, preventDefault: true },
+    { linux: "Ctrl-Shift-z", run: redo, preventDefault: true },
+    { key: "Mod-u", run: undoSelection, preventDefault: true },
+    { key: "Alt-u", mac: "Mod-Shift-u", run: redoSelection, preventDefault: true }
+];
+
+function updateSel(sel, by) {
+    return EditorSelection.create(sel.ranges.map(by), sel.mainIndex);
+}
+function setSel(state, selection) {
+    return state.update({ selection, scrollIntoView: true, userEvent: "select" });
+}
+function moveSel({ state, dispatch }, how) {
+    let selection = updateSel(state.selection, how);
+    if (selection.eq(state.selection))
+        return false;
+    dispatch(setSel(state, selection));
+    return true;
+}
+function rangeEnd(range, forward) {
+    return EditorSelection.cursor(forward ? range.to : range.from);
+}
+function cursorByChar(view, forward) {
+    return moveSel(view, range => range.empty ? view.moveByChar(range, forward) : rangeEnd(range, forward));
+}
+function ltrAtCursor(view) {
+    return view.textDirectionAt(view.state.selection.main.head) == Direction.LTR;
+}
+/**
+Move the selection one character to the left (which is backward in
+left-to-right text, forward in right-to-left text).
+*/
+const cursorCharLeft = view => cursorByChar(view, !ltrAtCursor(view));
+/**
+Move the selection one character to the right.
+*/
+const cursorCharRight = view => cursorByChar(view, ltrAtCursor(view));
+function cursorByGroup(view, forward) {
+    return moveSel(view, range => range.empty ? view.moveByGroup(range, forward) : rangeEnd(range, forward));
+}
+/**
+Move the selection to the left across one group of word or
+non-word (but also non-space) characters.
+*/
+const cursorGroupLeft = view => cursorByGroup(view, !ltrAtCursor(view));
+/**
+Move the selection one group to the right.
+*/
+const cursorGroupRight = view => cursorByGroup(view, ltrAtCursor(view));
+function interestingNode(state, node, bracketProp) {
+    if (node.type.prop(bracketProp))
+        return true;
+    let len = node.to - node.from;
+    return len && (len > 2 || /[^\s,.;:]/.test(state.sliceDoc(node.from, node.to))) || node.firstChild;
+}
+function moveBySyntax(state, start, forward) {
+    let pos = syntaxTree(state).resolveInner(start.head);
+    let bracketProp = forward ? NodeProp.closedBy : NodeProp.openedBy;
+    // Scan forward through child nodes to see if there's an interesting
+    // node ahead.
+    for (let at = start.head;;) {
+        let next = forward ? pos.childAfter(at) : pos.childBefore(at);
+        if (!next)
+            break;
+        if (interestingNode(state, next, bracketProp))
+            pos = next;
+        else
+            at = forward ? next.to : next.from;
+    }
+    let bracket = pos.type.prop(bracketProp), match, newPos;
+    if (bracket && (match = forward ? matchBrackets(state, pos.from, 1) : matchBrackets(state, pos.to, -1)) && match.matched)
+        newPos = forward ? match.end.to : match.end.from;
+    else
+        newPos = forward ? pos.to : pos.from;
+    return EditorSelection.cursor(newPos, forward ? -1 : 1);
+}
+/**
+Move the cursor over the next syntactic element to the left.
+*/
+const cursorSyntaxLeft = view => moveSel(view, range => moveBySyntax(view.state, range, !ltrAtCursor(view)));
+/**
+Move the cursor over the next syntactic element to the right.
+*/
+const cursorSyntaxRight = view => moveSel(view, range => moveBySyntax(view.state, range, ltrAtCursor(view)));
+function cursorByLine(view, forward) {
+    return moveSel(view, range => {
+        if (!range.empty)
+            return rangeEnd(range, forward);
+        let moved = view.moveVertically(range, forward);
+        return moved.head != range.head ? moved : view.moveToLineBoundary(range, forward);
+    });
+}
+/**
+Move the selection one line up.
+*/
+const cursorLineUp = view => cursorByLine(view, false);
+/**
+Move the selection one line down.
+*/
+const cursorLineDown = view => cursorByLine(view, true);
+function pageHeight(view) {
+    return Math.max(view.defaultLineHeight, Math.min(view.dom.clientHeight, innerHeight) - 5);
+}
+function cursorByPage(view, forward) {
+    let { state } = view, selection = updateSel(state.selection, range => {
+        return range.empty ? view.moveVertically(range, forward, pageHeight(view)) : rangeEnd(range, forward);
+    });
+    if (selection.eq(state.selection))
+        return false;
+    let startPos = view.coordsAtPos(state.selection.main.head);
+    let scrollRect = view.scrollDOM.getBoundingClientRect();
+    let effect;
+    if (startPos && startPos.top > scrollRect.top && startPos.bottom < scrollRect.bottom &&
+        startPos.top - scrollRect.top <= view.scrollDOM.scrollHeight - view.scrollDOM.scrollTop - view.scrollDOM.clientHeight)
+        effect = EditorView.scrollIntoView(selection.main.head, { y: "start", yMargin: startPos.top - scrollRect.top });
+    view.dispatch(setSel(state, selection), { effects: effect });
+    return true;
+}
+/**
+Move the selection one page up.
+*/
+const cursorPageUp = view => cursorByPage(view, false);
+/**
+Move the selection one page down.
+*/
+const cursorPageDown = view => cursorByPage(view, true);
+function moveByLineBoundary(view, start, forward) {
+    let line = view.lineBlockAt(start.head), moved = view.moveToLineBoundary(start, forward);
+    if (moved.head == start.head && moved.head != (forward ? line.to : line.from))
+        moved = view.moveToLineBoundary(start, forward, false);
+    if (!forward && moved.head == line.from && line.length) {
+        let space = /^\s*/.exec(view.state.sliceDoc(line.from, Math.min(line.from + 100, line.to)))[0].length;
+        if (space && start.head != line.from + space)
+            moved = EditorSelection.cursor(line.from + space);
+    }
+    return moved;
+}
+/**
+Move the selection to the next line wrap point, or to the end of
+the line if there isn't one left on this line.
+*/
+const cursorLineBoundaryForward = view => moveSel(view, range => moveByLineBoundary(view, range, true));
+/**
+Move the selection to previous line wrap point, or failing that to
+the start of the line. If the line is indented, and the cursor
+isn't already at the end of the indentation, this will move to the
+end of the indentation instead of the start of the line.
+*/
+const cursorLineBoundaryBackward = view => moveSel(view, range => moveByLineBoundary(view, range, false));
+/**
+Move the selection to the start of the line.
+*/
+const cursorLineStart = view => moveSel(view, range => EditorSelection.cursor(view.lineBlockAt(range.head).from, 1));
+/**
+Move the selection to the end of the line.
+*/
+const cursorLineEnd = view => moveSel(view, range => EditorSelection.cursor(view.lineBlockAt(range.head).to, -1));
+function toMatchingBracket(state, dispatch, extend) {
+    let found = false, selection = updateSel(state.selection, range => {
+        let matching = matchBrackets(state, range.head, -1)
+            || matchBrackets(state, range.head, 1)
+            || (range.head > 0 && matchBrackets(state, range.head - 1, 1))
+            || (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1));
+        if (!matching || !matching.end)
+            return range;
+        found = true;
+        let head = matching.start.from == range.head ? matching.end.to : matching.end.from;
+        return extend ? EditorSelection.range(range.anchor, head) : EditorSelection.cursor(head);
+    });
+    if (!found)
+        return false;
+    dispatch(setSel(state, selection));
+    return true;
+}
+/**
+Move the selection to the bracket matching the one it is currently
+on, if any.
+*/
+const cursorMatchingBracket = ({ state, dispatch }) => toMatchingBracket(state, dispatch, false);
+function extendSel(view, how) {
+    let selection = updateSel(view.state.selection, range => {
+        let head = how(range);
+        return EditorSelection.range(range.anchor, head.head, head.goalColumn);
+    });
+    if (selection.eq(view.state.selection))
+        return false;
+    view.dispatch(setSel(view.state, selection));
+    return true;
+}
+function selectByChar(view, forward) {
+    return extendSel(view, range => view.moveByChar(range, forward));
+}
+/**
+Move the selection head one character to the left, while leaving
+the anchor in place.
+*/
+const selectCharLeft = view => selectByChar(view, !ltrAtCursor(view));
+/**
+Move the selection head one character to the right.
+*/
+const selectCharRight = view => selectByChar(view, ltrAtCursor(view));
+function selectByGroup(view, forward) {
+    return extendSel(view, range => view.moveByGroup(range, forward));
+}
+/**
+Move the selection head one [group](https://codemirror.net/6/docs/ref/#commands.cursorGroupLeft) to
+the left.
+*/
+const selectGroupLeft = view => selectByGroup(view, !ltrAtCursor(view));
+/**
+Move the selection head one group to the right.
+*/
+const selectGroupRight = view => selectByGroup(view, ltrAtCursor(view));
+/**
+Move the selection head over the next syntactic element to the left.
+*/
+const selectSyntaxLeft = view => extendSel(view, range => moveBySyntax(view.state, range, !ltrAtCursor(view)));
+/**
+Move the selection head over the next syntactic element to the right.
+*/
+const selectSyntaxRight = view => extendSel(view, range => moveBySyntax(view.state, range, ltrAtCursor(view)));
+function selectByLine(view, forward) {
+    return extendSel(view, range => view.moveVertically(range, forward));
+}
+/**
+Move the selection head one line up.
+*/
+const selectLineUp = view => selectByLine(view, false);
+/**
+Move the selection head one line down.
+*/
+const selectLineDown = view => selectByLine(view, true);
+function selectByPage(view, forward) {
+    return extendSel(view, range => view.moveVertically(range, forward, pageHeight(view)));
+}
+/**
+Move the selection head one page up.
+*/
+const selectPageUp = view => selectByPage(view, false);
+/**
+Move the selection head one page down.
+*/
+const selectPageDown = view => selectByPage(view, true);
+/**
+Move the selection head to the next line boundary.
+*/
+const selectLineBoundaryForward = view => extendSel(view, range => moveByLineBoundary(view, range, true));
+/**
+Move the selection head to the previous line boundary.
+*/
+const selectLineBoundaryBackward = view => extendSel(view, range => moveByLineBoundary(view, range, false));
+/**
+Move the selection head to the start of the line.
+*/
+const selectLineStart = view => extendSel(view, range => EditorSelection.cursor(view.lineBlockAt(range.head).from));
+/**
+Move the selection head to the end of the line.
+*/
+const selectLineEnd = view => extendSel(view, range => EditorSelection.cursor(view.lineBlockAt(range.head).to));
+/**
+Move the selection to the start of the document.
+*/
+const cursorDocStart = ({ state, dispatch }) => {
+    dispatch(setSel(state, { anchor: 0 }));
+    return true;
+};
+/**
+Move the selection to the end of the document.
+*/
+const cursorDocEnd = ({ state, dispatch }) => {
+    dispatch(setSel(state, { anchor: state.doc.length }));
+    return true;
+};
+/**
+Move the selection head to the start of the document.
+*/
+const selectDocStart = ({ state, dispatch }) => {
+    dispatch(setSel(state, { anchor: state.selection.main.anchor, head: 0 }));
+    return true;
+};
+/**
+Move the selection head to the end of the document.
+*/
+const selectDocEnd = ({ state, dispatch }) => {
+    dispatch(setSel(state, { anchor: state.selection.main.anchor, head: state.doc.length }));
+    return true;
+};
+/**
+Select the entire document.
+*/
+const selectAll = ({ state, dispatch }) => {
+    dispatch(state.update({ selection: { anchor: 0, head: state.doc.length }, userEvent: "select" }));
+    return true;
+};
+/**
+Expand the selection to cover entire lines.
+*/
+const selectLine = ({ state, dispatch }) => {
+    let ranges = selectedLineBlocks(state).map(({ from, to }) => EditorSelection.range(from, Math.min(to + 1, state.doc.length)));
+    dispatch(state.update({ selection: EditorSelection.create(ranges), userEvent: "select" }));
+    return true;
+};
+/**
+Select the next syntactic construct that is larger than the
+selection. Note that this will only work insofar as the language
+[provider](https://codemirror.net/6/docs/ref/#language.language) you use builds up a full
+syntax tree.
+*/
+const selectParentSyntax = ({ state, dispatch }) => {
+    let selection = updateSel(state.selection, range => {
+        var _a;
+        let context = syntaxTree(state).resolveInner(range.head, 1);
+        while (!((context.from < range.from && context.to >= range.to) ||
+            (context.to > range.to && context.from <= range.from) ||
+            !((_a = context.parent) === null || _a === void 0 ? void 0 : _a.parent)))
+            context = context.parent;
+        return EditorSelection.range(context.to, context.from);
+    });
+    dispatch(setSel(state, selection));
+    return true;
+};
+/**
+Simplify the current selection. When multiple ranges are selected,
+reduce it to its main range. Otherwise, if the selection is
+non-empty, convert it to a cursor selection.
+*/
+const simplifySelection = ({ state, dispatch }) => {
+    let cur = state.selection, selection = null;
+    if (cur.ranges.length > 1)
+        selection = EditorSelection.create([cur.main]);
+    else if (!cur.main.empty)
+        selection = EditorSelection.create([EditorSelection.cursor(cur.main.head)]);
+    if (!selection)
+        return false;
+    dispatch(setSel(state, selection));
+    return true;
+};
+function deleteBy({ state, dispatch }, by) {
+    if (state.readOnly)
+        return false;
+    let event = "delete.selection";
+    let changes = state.changeByRange(range => {
+        let { from, to } = range;
+        if (from == to) {
+            let towards = by(from);
+            if (towards < from)
+                event = "delete.backward";
+            else if (towards > from)
+                event = "delete.forward";
+            from = Math.min(from, towards);
+            to = Math.max(to, towards);
+        }
+        return from == to ? { range } : { changes: { from, to }, range: EditorSelection.cursor(from) };
+    });
+    if (changes.changes.empty)
+        return false;
+    dispatch(state.update(changes, {
+        scrollIntoView: true,
+        userEvent: event,
+        effects: event == "delete.selection" ? EditorView.announce.of(state.phrase("Selection deleted")) : undefined
+    }));
+    return true;
+}
+function skipAtomic(target, pos, forward) {
+    if (target instanceof EditorView)
+        for (let ranges of target.state.facet(EditorView.atomicRanges).map(f => f(target)))
+            ranges.between(pos, pos, (from, to) => {
+                if (from < pos && to > pos)
+                    pos = forward ? to : from;
+            });
+    return pos;
+}
+const deleteByChar = (target, forward) => deleteBy(target, pos => {
+    let { state } = target, line = state.doc.lineAt(pos), before, targetPos;
+    if (!forward && pos > line.from && pos < line.from + 200 &&
+        !/[^ \t]/.test(before = line.text.slice(0, pos - line.from))) {
+        if (before[before.length - 1] == "\t")
+            return pos - 1;
+        let col = countColumn(before, state.tabSize), drop = col % getIndentUnit(state) || getIndentUnit(state);
+        for (let i = 0; i < drop && before[before.length - 1 - i] == " "; i++)
+            pos--;
+        targetPos = pos;
+    }
+    else {
+        targetPos = findClusterBreak(line.text, pos - line.from, forward, forward) + line.from;
+        if (targetPos == pos && line.number != (forward ? state.doc.lines : 1))
+            targetPos += forward ? 1 : -1;
+    }
+    return skipAtomic(target, targetPos, forward);
+});
+/**
+Delete the selection, or, for cursor selections, the character
+before the cursor.
+*/
+const deleteCharBackward = view => deleteByChar(view, false);
+/**
+Delete the selection or the character after the cursor.
+*/
+const deleteCharForward = view => deleteByChar(view, true);
+const deleteByGroup = (target, forward) => deleteBy(target, start => {
+    let pos = start, { state } = target, line = state.doc.lineAt(pos);
+    let categorize = state.charCategorizer(pos);
+    for (let cat = null;;) {
+        if (pos == (forward ? line.to : line.from)) {
+            if (pos == start && line.number != (forward ? state.doc.lines : 1))
+                pos += forward ? 1 : -1;
+            break;
+        }
+        let next = findClusterBreak(line.text, pos - line.from, forward) + line.from;
+        let nextChar = line.text.slice(Math.min(pos, next) - line.from, Math.max(pos, next) - line.from);
+        let nextCat = categorize(nextChar);
+        if (cat != null && nextCat != cat)
+            break;
+        if (nextChar != " " || pos != start)
+            cat = nextCat;
+        pos = next;
+    }
+    return skipAtomic(target, pos, forward);
+});
+/**
+Delete the selection or backward until the end of the next
+[group](https://codemirror.net/6/docs/ref/#view.EditorView.moveByGroup), only skipping groups of
+whitespace when they consist of a single space.
+*/
+const deleteGroupBackward = target => deleteByGroup(target, false);
+/**
+Delete the selection or forward until the end of the next group.
+*/
+const deleteGroupForward = target => deleteByGroup(target, true);
+/**
+Delete the selection, or, if it is a cursor selection, delete to
+the end of the line. If the cursor is directly at the end of the
+line, delete the line break after it.
+*/
+const deleteToLineEnd = view => deleteBy(view, pos => {
+    let lineEnd = view.lineBlockAt(pos).to;
+    return skipAtomic(view, pos < lineEnd ? lineEnd : Math.min(view.state.doc.length, pos + 1), true);
+});
+/**
+Delete the selection, or, if it is a cursor selection, delete to
+the start of the line. If the cursor is directly at the start of the
+line, delete the line break before it.
+*/
+const deleteToLineStart = view => deleteBy(view, pos => {
+    let lineStart = view.lineBlockAt(pos).from;
+    return skipAtomic(view, pos > lineStart ? lineStart : Math.max(0, pos - 1), false);
+});
+/**
+Replace each selection range with a line break, leaving the cursor
+on the line before the break.
+*/
+const splitLine = ({ state, dispatch }) => {
+    if (state.readOnly)
+        return false;
+    let changes = state.changeByRange(range => {
+        return { changes: { from: range.from, to: range.to, insert: Text.of(["", ""]) },
+            range: EditorSelection.cursor(range.from) };
+    });
+    dispatch(state.update(changes, { scrollIntoView: true, userEvent: "input" }));
+    return true;
+};
+/**
+Flip the characters before and after the cursor(s).
+*/
+const transposeChars = ({ state, dispatch }) => {
+    if (state.readOnly)
+        return false;
+    let changes = state.changeByRange(range => {
+        if (!range.empty || range.from == 0 || range.from == state.doc.length)
+            return { range };
+        let pos = range.from, line = state.doc.lineAt(pos);
+        let from = pos == line.from ? pos - 1 : findClusterBreak(line.text, pos - line.from, false) + line.from;
+        let to = pos == line.to ? pos + 1 : findClusterBreak(line.text, pos - line.from, true) + line.from;
+        return { changes: { from, to, insert: state.doc.slice(pos, to).append(state.doc.slice(from, pos)) },
+            range: EditorSelection.cursor(to) };
+    });
+    if (changes.changes.empty)
+        return false;
+    dispatch(state.update(changes, { scrollIntoView: true, userEvent: "move.character" }));
+    return true;
+};
+function selectedLineBlocks(state) {
+    let blocks = [], upto = -1;
+    for (let range of state.selection.ranges) {
+        let startLine = state.doc.lineAt(range.from), endLine = state.doc.lineAt(range.to);
+        if (!range.empty && range.to == endLine.from)
+            endLine = state.doc.lineAt(range.to - 1);
+        if (upto >= startLine.number) {
+            let prev = blocks[blocks.length - 1];
+            prev.to = endLine.to;
+            prev.ranges.push(range);
+        }
+        else {
+            blocks.push({ from: startLine.from, to: endLine.to, ranges: [range] });
+        }
+        upto = endLine.number + 1;
+    }
+    return blocks;
+}
+function moveLine(state, dispatch, forward) {
+    if (state.readOnly)
+        return false;
+    let changes = [], ranges = [];
+    for (let block of selectedLineBlocks(state)) {
+        if (forward ? block.to == state.doc.length : block.from == 0)
+            continue;
+        let nextLine = state.doc.lineAt(forward ? block.to + 1 : block.from - 1);
+        let size = nextLine.length + 1;
+        if (forward) {
+            changes.push({ from: block.to, to: nextLine.to }, { from: block.from, insert: nextLine.text + state.lineBreak });
+            for (let r of block.ranges)
+                ranges.push(EditorSelection.range(Math.min(state.doc.length, r.anchor + size), Math.min(state.doc.length, r.head + size)));
+        }
+        else {
+            changes.push({ from: nextLine.from, to: block.from }, { from: block.to, insert: state.lineBreak + nextLine.text });
+            for (let r of block.ranges)
+                ranges.push(EditorSelection.range(r.anchor - size, r.head - size));
+        }
+    }
+    if (!changes.length)
+        return false;
+    dispatch(state.update({
+        changes,
+        scrollIntoView: true,
+        selection: EditorSelection.create(ranges, state.selection.mainIndex),
+        userEvent: "move.line"
+    }));
+    return true;
+}
+/**
+Move the selected lines up one line.
+*/
+const moveLineUp = ({ state, dispatch }) => moveLine(state, dispatch, false);
+/**
+Move the selected lines down one line.
+*/
+const moveLineDown = ({ state, dispatch }) => moveLine(state, dispatch, true);
+function copyLine(state, dispatch, forward) {
+    if (state.readOnly)
+        return false;
+    let changes = [];
+    for (let block of selectedLineBlocks(state)) {
+        if (forward)
+            changes.push({ from: block.from, insert: state.doc.slice(block.from, block.to) + state.lineBreak });
+        else
+            changes.push({ from: block.to, insert: state.lineBreak + state.doc.slice(block.from, block.to) });
+    }
+    dispatch(state.update({ changes, scrollIntoView: true, userEvent: "input.copyline" }));
+    return true;
+}
+/**
+Create a copy of the selected lines. Keep the selection in the top copy.
+*/
+const copyLineUp = ({ state, dispatch }) => copyLine(state, dispatch, false);
+/**
+Create a copy of the selected lines. Keep the selection in the bottom copy.
+*/
+const copyLineDown = ({ state, dispatch }) => copyLine(state, dispatch, true);
+/**
+Delete selected lines.
+*/
+const deleteLine = view => {
+    if (view.state.readOnly)
+        return false;
+    let { state } = view, changes = state.changes(selectedLineBlocks(state).map(({ from, to }) => {
+        if (from > 0)
+            from--;
+        else if (to < state.doc.length)
+            to++;
+        return { from, to };
+    }));
+    let selection = updateSel(state.selection, range => view.moveVertically(range, true)).map(changes);
+    view.dispatch({ changes, selection, scrollIntoView: true, userEvent: "delete.line" });
+    return true;
+};
+function isBetweenBrackets(state, pos) {
+    if (/\(\)|\[\]|\{\}/.test(state.sliceDoc(pos - 1, pos + 1)))
+        return { from: pos, to: pos };
+    let context = syntaxTree(state).resolveInner(pos);
+    let before = context.childBefore(pos), after = context.childAfter(pos), closedBy;
+    if (before && after && before.to <= pos && after.from >= pos &&
+        (closedBy = before.type.prop(NodeProp.closedBy)) && closedBy.indexOf(after.name) > -1 &&
+        state.doc.lineAt(before.to).from == state.doc.lineAt(after.from).from)
+        return { from: before.to, to: after.from };
+    return null;
+}
+/**
+Replace the selection with a newline and indent the newly created
+line(s). If the current line consists only of whitespace, this
+will also delete that whitespace. When the cursor is between
+matching brackets, an additional newline will be inserted after
+the cursor.
+*/
+const insertNewlineAndIndent = /*@__PURE__*/newlineAndIndent(false);
+/**
+Create a blank, indented line below the current line.
+*/
+const insertBlankLine = /*@__PURE__*/newlineAndIndent(true);
+function newlineAndIndent(atEof) {
+    return ({ state, dispatch }) => {
+        if (state.readOnly)
+            return false;
+        let changes = state.changeByRange(range => {
+            let { from, to } = range, line = state.doc.lineAt(from);
+            let explode = !atEof && from == to && isBetweenBrackets(state, from);
+            if (atEof)
+                from = to = (to <= line.to ? line : state.doc.lineAt(to)).to;
+            let cx = new IndentContext(state, { simulateBreak: from, simulateDoubleBreak: !!explode });
+            let indent = getIndentation(cx, from);
+            if (indent == null)
+                indent = /^\s*/.exec(state.doc.lineAt(from).text)[0].length;
+            while (to < line.to && /\s/.test(line.text[to - line.from]))
+                to++;
+            if (explode)
+                ({ from, to } = explode);
+            else if (from > line.from && from < line.from + 100 && !/\S/.test(line.text.slice(0, from)))
+                from = line.from;
+            let insert = ["", indentString(state, indent)];
+            if (explode)
+                insert.push(indentString(state, cx.lineIndent(line.from, -1)));
+            return { changes: { from, to, insert: Text.of(insert) },
+                range: EditorSelection.cursor(from + 1 + insert[1].length) };
+        });
+        dispatch(state.update(changes, { scrollIntoView: true, userEvent: "input" }));
+        return true;
+    };
+}
+function changeBySelectedLine(state, f) {
+    let atLine = -1;
+    return state.changeByRange(range => {
+        let changes = [];
+        for (let pos = range.from; pos <= range.to;) {
+            let line = state.doc.lineAt(pos);
+            if (line.number > atLine && (range.empty || range.to > line.from)) {
+                f(line, changes, range);
+                atLine = line.number;
+            }
+            pos = line.to + 1;
+        }
+        let changeSet = state.changes(changes);
+        return { changes,
+            range: EditorSelection.range(changeSet.mapPos(range.anchor, 1), changeSet.mapPos(range.head, 1)) };
+    });
+}
+/**
+Auto-indent the selected lines. This uses the [indentation service
+facet](https://codemirror.net/6/docs/ref/#language.indentService) as source for auto-indent
+information.
+*/
+const indentSelection = ({ state, dispatch }) => {
+    if (state.readOnly)
+        return false;
+    let updated = Object.create(null);
+    let context = new IndentContext(state, { overrideIndentation: start => {
+            let found = updated[start];
+            return found == null ? -1 : found;
+        } });
+    let changes = changeBySelectedLine(state, (line, changes, range) => {
+        let indent = getIndentation(context, line.from);
+        if (indent == null)
+            return;
+        if (!/\S/.test(line.text))
+            indent = 0;
+        let cur = /^\s*/.exec(line.text)[0];
+        let norm = indentString(state, indent);
+        if (cur != norm || range.from < line.from + cur.length) {
+            updated[line.from] = indent;
+            changes.push({ from: line.from, to: line.from + cur.length, insert: norm });
+        }
+    });
+    if (!changes.changes.empty)
+        dispatch(state.update(changes, { userEvent: "indent" }));
+    return true;
+};
+/**
+Add a [unit](https://codemirror.net/6/docs/ref/#language.indentUnit) of indentation to all selected
+lines.
+*/
+const indentMore = ({ state, dispatch }) => {
+    if (state.readOnly)
+        return false;
+    dispatch(state.update(changeBySelectedLine(state, (line, changes) => {
+        changes.push({ from: line.from, insert: state.facet(indentUnit) });
+    }), { userEvent: "input.indent" }));
+    return true;
+};
+/**
+Remove a [unit](https://codemirror.net/6/docs/ref/#language.indentUnit) of indentation from all
+selected lines.
+*/
+const indentLess = ({ state, dispatch }) => {
+    if (state.readOnly)
+        return false;
+    dispatch(state.update(changeBySelectedLine(state, (line, changes) => {
+        let space = /^\s*/.exec(line.text)[0];
+        if (!space)
+            return;
+        let col = countColumn(space, state.tabSize), keep = 0;
+        let insert = indentString(state, Math.max(0, col - getIndentUnit(state)));
+        while (keep < space.length && keep < insert.length && space.charCodeAt(keep) == insert.charCodeAt(keep))
+            keep++;
+        changes.push({ from: line.from + keep, to: line.from + space.length, insert: insert.slice(keep) });
+    }), { userEvent: "delete.dedent" }));
+    return true;
+};
+/**
+Array of key bindings containing the Emacs-style bindings that are
+available on macOS by default.
+
+ - Ctrl-b: [`cursorCharLeft`](https://codemirror.net/6/docs/ref/#commands.cursorCharLeft) ([`selectCharLeft`](https://codemirror.net/6/docs/ref/#commands.selectCharLeft) with Shift)
+ - Ctrl-f: [`cursorCharRight`](https://codemirror.net/6/docs/ref/#commands.cursorCharRight) ([`selectCharRight`](https://codemirror.net/6/docs/ref/#commands.selectCharRight) with Shift)
+ - Ctrl-p: [`cursorLineUp`](https://codemirror.net/6/docs/ref/#commands.cursorLineUp) ([`selectLineUp`](https://codemirror.net/6/docs/ref/#commands.selectLineUp) with Shift)
+ - Ctrl-n: [`cursorLineDown`](https://codemirror.net/6/docs/ref/#commands.cursorLineDown) ([`selectLineDown`](https://codemirror.net/6/docs/ref/#commands.selectLineDown) with Shift)
+ - Ctrl-a: [`cursorLineStart`](https://codemirror.net/6/docs/ref/#commands.cursorLineStart) ([`selectLineStart`](https://codemirror.net/6/docs/ref/#commands.selectLineStart) with Shift)
+ - Ctrl-e: [`cursorLineEnd`](https://codemirror.net/6/docs/ref/#commands.cursorLineEnd) ([`selectLineEnd`](https://codemirror.net/6/docs/ref/#commands.selectLineEnd) with Shift)
+ - Ctrl-d: [`deleteCharForward`](https://codemirror.net/6/docs/ref/#commands.deleteCharForward)
+ - Ctrl-h: [`deleteCharBackward`](https://codemirror.net/6/docs/ref/#commands.deleteCharBackward)
+ - Ctrl-k: [`deleteToLineEnd`](https://codemirror.net/6/docs/ref/#commands.deleteToLineEnd)
+ - Ctrl-Alt-h: [`deleteGroupBackward`](https://codemirror.net/6/docs/ref/#commands.deleteGroupBackward)
+ - Ctrl-o: [`splitLine`](https://codemirror.net/6/docs/ref/#commands.splitLine)
+ - Ctrl-t: [`transposeChars`](https://codemirror.net/6/docs/ref/#commands.transposeChars)
+ - Ctrl-v: [`cursorPageDown`](https://codemirror.net/6/docs/ref/#commands.cursorPageDown)
+ - Alt-v: [`cursorPageUp`](https://codemirror.net/6/docs/ref/#commands.cursorPageUp)
+*/
+const emacsStyleKeymap = [
+    { key: "Ctrl-b", run: cursorCharLeft, shift: selectCharLeft, preventDefault: true },
+    { key: "Ctrl-f", run: cursorCharRight, shift: selectCharRight },
+    { key: "Ctrl-p", run: cursorLineUp, shift: selectLineUp },
+    { key: "Ctrl-n", run: cursorLineDown, shift: selectLineDown },
+    { key: "Ctrl-a", run: cursorLineStart, shift: selectLineStart },
+    { key: "Ctrl-e", run: cursorLineEnd, shift: selectLineEnd },
+    { key: "Ctrl-d", run: deleteCharForward },
+    { key: "Ctrl-h", run: deleteCharBackward },
+    { key: "Ctrl-k", run: deleteToLineEnd },
+    { key: "Ctrl-Alt-h", run: deleteGroupBackward },
+    { key: "Ctrl-o", run: splitLine },
+    { key: "Ctrl-t", run: transposeChars },
+    { key: "Ctrl-v", run: cursorPageDown },
+];
+/**
+An array of key bindings closely sticking to platform-standard or
+widely used bindings. (This includes the bindings from
+[`emacsStyleKeymap`](https://codemirror.net/6/docs/ref/#commands.emacsStyleKeymap), with their `key`
+property changed to `mac`.)
+
+ - ArrowLeft: [`cursorCharLeft`](https://codemirror.net/6/docs/ref/#commands.cursorCharLeft) ([`selectCharLeft`](https://codemirror.net/6/docs/ref/#commands.selectCharLeft) with Shift)
+ - ArrowRight: [`cursorCharRight`](https://codemirror.net/6/docs/ref/#commands.cursorCharRight) ([`selectCharRight`](https://codemirror.net/6/docs/ref/#commands.selectCharRight) with Shift)
+ - Ctrl-ArrowLeft (Alt-ArrowLeft on macOS): [`cursorGroupLeft`](https://codemirror.net/6/docs/ref/#commands.cursorGroupLeft) ([`selectGroupLeft`](https://codemirror.net/6/docs/ref/#commands.selectGroupLeft) with Shift)
+ - Ctrl-ArrowRight (Alt-ArrowRight on macOS): [`cursorGroupRight`](https://codemirror.net/6/docs/ref/#commands.cursorGroupRight) ([`selectGroupRight`](https://codemirror.net/6/docs/ref/#commands.selectGroupRight) with Shift)
+ - Cmd-ArrowLeft (on macOS): [`cursorLineStart`](https://codemirror.net/6/docs/ref/#commands.cursorLineStart) ([`selectLineStart`](https://codemirror.net/6/docs/ref/#commands.selectLineStart) with Shift)
+ - Cmd-ArrowRight (on macOS): [`cursorLineEnd`](https://codemirror.net/6/docs/ref/#commands.cursorLineEnd) ([`selectLineEnd`](https://codemirror.net/6/docs/ref/#commands.selectLineEnd) with Shift)
+ - ArrowUp: [`cursorLineUp`](https://codemirror.net/6/docs/ref/#commands.cursorLineUp) ([`selectLineUp`](https://codemirror.net/6/docs/ref/#commands.selectLineUp) with Shift)
+ - ArrowDown: [`cursorLineDown`](https://codemirror.net/6/docs/ref/#commands.cursorLineDown) ([`selectLineDown`](https://codemirror.net/6/docs/ref/#commands.selectLineDown) with Shift)
+ - Cmd-ArrowUp (on macOS): [`cursorDocStart`](https://codemirror.net/6/docs/ref/#commands.cursorDocStart) ([`selectDocStart`](https://codemirror.net/6/docs/ref/#commands.selectDocStart) with Shift)
+ - Cmd-ArrowDown (on macOS): [`cursorDocEnd`](https://codemirror.net/6/docs/ref/#commands.cursorDocEnd) ([`selectDocEnd`](https://codemirror.net/6/docs/ref/#commands.selectDocEnd) with Shift)
+ - Ctrl-ArrowUp (on macOS): [`cursorPageUp`](https://codemirror.net/6/docs/ref/#commands.cursorPageUp) ([`selectPageUp`](https://codemirror.net/6/docs/ref/#commands.selectPageUp) with Shift)
+ - Ctrl-ArrowDown (on macOS): [`cursorPageDown`](https://codemirror.net/6/docs/ref/#commands.cursorPageDown) ([`selectPageDown`](https://codemirror.net/6/docs/ref/#commands.selectPageDown) with Shift)
+ - PageUp: [`cursorPageUp`](https://codemirror.net/6/docs/ref/#commands.cursorPageUp) ([`selectPageUp`](https://codemirror.net/6/docs/ref/#commands.selectPageUp) with Shift)
+ - PageDown: [`cursorPageDown`](https://codemirror.net/6/docs/ref/#commands.cursorPageDown) ([`selectPageDown`](https://codemirror.net/6/docs/ref/#commands.selectPageDown) with Shift)
+ - Home: [`cursorLineBoundaryBackward`](https://codemirror.net/6/docs/ref/#commands.cursorLineBoundaryBackward) ([`selectLineBoundaryBackward`](https://codemirror.net/6/docs/ref/#commands.selectLineBoundaryBackward) with Shift)
+ - End: [`cursorLineBoundaryForward`](https://codemirror.net/6/docs/ref/#commands.cursorLineBoundaryForward) ([`selectLineBoundaryForward`](https://codemirror.net/6/docs/ref/#commands.selectLineBoundaryForward) with Shift)
+ - Ctrl-Home (Cmd-Home on macOS): [`cursorDocStart`](https://codemirror.net/6/docs/ref/#commands.cursorDocStart) ([`selectDocStart`](https://codemirror.net/6/docs/ref/#commands.selectDocStart) with Shift)
+ - Ctrl-End (Cmd-Home on macOS): [`cursorDocEnd`](https://codemirror.net/6/docs/ref/#commands.cursorDocEnd) ([`selectDocEnd`](https://codemirror.net/6/docs/ref/#commands.selectDocEnd) with Shift)
+ - Enter: [`insertNewlineAndIndent`](https://codemirror.net/6/docs/ref/#commands.insertNewlineAndIndent)
+ - Ctrl-a (Cmd-a on macOS): [`selectAll`](https://codemirror.net/6/docs/ref/#commands.selectAll)
+ - Backspace: [`deleteCharBackward`](https://codemirror.net/6/docs/ref/#commands.deleteCharBackward)
+ - Delete: [`deleteCharForward`](https://codemirror.net/6/docs/ref/#commands.deleteCharForward)
+ - Ctrl-Backspace (Alt-Backspace on macOS): [`deleteGroupBackward`](https://codemirror.net/6/docs/ref/#commands.deleteGroupBackward)
+ - Ctrl-Delete (Alt-Delete on macOS): [`deleteGroupForward`](https://codemirror.net/6/docs/ref/#commands.deleteGroupForward)
+ - Cmd-Backspace (macOS): [`deleteToLineStart`](https://codemirror.net/6/docs/ref/#commands.deleteToLineStart).
+ - Cmd-Delete (macOS): [`deleteToLineEnd`](https://codemirror.net/6/docs/ref/#commands.deleteToLineEnd).
+*/
+const standardKeymap = /*@__PURE__*/[
+    { key: "ArrowLeft", run: cursorCharLeft, shift: selectCharLeft, preventDefault: true },
+    { key: "Mod-ArrowLeft", mac: "Alt-ArrowLeft", run: cursorGroupLeft, shift: selectGroupLeft },
+    { mac: "Cmd-ArrowLeft", run: cursorLineBoundaryBackward, shift: selectLineBoundaryBackward },
+    { key: "ArrowRight", run: cursorCharRight, shift: selectCharRight, preventDefault: true },
+    { key: "Mod-ArrowRight", mac: "Alt-ArrowRight", run: cursorGroupRight, shift: selectGroupRight },
+    { mac: "Cmd-ArrowRight", run: cursorLineBoundaryForward, shift: selectLineBoundaryForward },
+    { key: "ArrowUp", run: cursorLineUp, shift: selectLineUp, preventDefault: true },
+    { mac: "Cmd-ArrowUp", run: cursorDocStart, shift: selectDocStart },
+    { mac: "Ctrl-ArrowUp", run: cursorPageUp, shift: selectPageUp },
+    { key: "ArrowDown", run: cursorLineDown, shift: selectLineDown, preventDefault: true },
+    { mac: "Cmd-ArrowDown", run: cursorDocEnd, shift: selectDocEnd },
+    { mac: "Ctrl-ArrowDown", run: cursorPageDown, shift: selectPageDown },
+    { key: "PageUp", run: cursorPageUp, shift: selectPageUp },
+    { key: "PageDown", run: cursorPageDown, shift: selectPageDown },
+    { key: "Home", run: cursorLineBoundaryBackward, shift: selectLineBoundaryBackward, preventDefault: true },
+    { key: "Mod-Home", run: cursorDocStart, shift: selectDocStart },
+    { key: "End", run: cursorLineBoundaryForward, shift: selectLineBoundaryForward, preventDefault: true },
+    { key: "Mod-End", run: cursorDocEnd, shift: selectDocEnd },
+    { key: "Enter", run: insertNewlineAndIndent },
+    { key: "Mod-a", run: selectAll },
+    { key: "Backspace", run: deleteCharBackward, shift: deleteCharBackward },
+    { key: "Delete", run: deleteCharForward },
+    { key: "Mod-Backspace", mac: "Alt-Backspace", run: deleteGroupBackward },
+    { key: "Mod-Delete", mac: "Alt-Delete", run: deleteGroupForward },
+    { mac: "Mod-Backspace", run: deleteToLineStart },
+    { mac: "Mod-Delete", run: deleteToLineEnd }
+].concat(/*@__PURE__*/emacsStyleKeymap.map(b => ({ mac: b.key, run: b.run, shift: b.shift })));
+/**
+The default keymap. Includes all bindings from
+[`standardKeymap`](https://codemirror.net/6/docs/ref/#commands.standardKeymap) plus the following:
+
+- Alt-ArrowLeft (Ctrl-ArrowLeft on macOS): [`cursorSyntaxLeft`](https://codemirror.net/6/docs/ref/#commands.cursorSyntaxLeft) ([`selectSyntaxLeft`](https://codemirror.net/6/docs/ref/#commands.selectSyntaxLeft) with Shift)
+- Alt-ArrowRight (Ctrl-ArrowRight on macOS): [`cursorSyntaxRight`](https://codemirror.net/6/docs/ref/#commands.cursorSyntaxRight) ([`selectSyntaxRight`](https://codemirror.net/6/docs/ref/#commands.selectSyntaxRight) with Shift)
+- Alt-ArrowUp: [`moveLineUp`](https://codemirror.net/6/docs/ref/#commands.moveLineUp)
+- Alt-ArrowDown: [`moveLineDown`](https://codemirror.net/6/docs/ref/#commands.moveLineDown)
+- Shift-Alt-ArrowUp: [`copyLineUp`](https://codemirror.net/6/docs/ref/#commands.copyLineUp)
+- Shift-Alt-ArrowDown: [`copyLineDown`](https://codemirror.net/6/docs/ref/#commands.copyLineDown)
+- Escape: [`simplifySelection`](https://codemirror.net/6/docs/ref/#commands.simplifySelection)
+- Ctrl-Enter (Comd-Enter on macOS): [`insertBlankLine`](https://codemirror.net/6/docs/ref/#commands.insertBlankLine)
+- Alt-l (Ctrl-l on macOS): [`selectLine`](https://codemirror.net/6/docs/ref/#commands.selectLine)
+- Ctrl-i (Cmd-i on macOS): [`selectParentSyntax`](https://codemirror.net/6/docs/ref/#commands.selectParentSyntax)
+- Ctrl-[ (Cmd-[ on macOS): [`indentLess`](https://codemirror.net/6/docs/ref/#commands.indentLess)
+- Ctrl-] (Cmd-] on macOS): [`indentMore`](https://codemirror.net/6/docs/ref/#commands.indentMore)
+- Ctrl-Alt-\\ (Cmd-Alt-\\ on macOS): [`indentSelection`](https://codemirror.net/6/docs/ref/#commands.indentSelection)
+- Shift-Ctrl-k (Shift-Cmd-k on macOS): [`deleteLine`](https://codemirror.net/6/docs/ref/#commands.deleteLine)
+- Shift-Ctrl-\\ (Shift-Cmd-\\ on macOS): [`cursorMatchingBracket`](https://codemirror.net/6/docs/ref/#commands.cursorMatchingBracket)
+- Ctrl-/ (Cmd-/ on macOS): [`toggleComment`](https://codemirror.net/6/docs/ref/#commands.toggleComment).
+- Shift-Alt-a: [`toggleBlockComment`](https://codemirror.net/6/docs/ref/#commands.toggleBlockComment).
+*/
+const defaultKeymap = /*@__PURE__*/[
+    { key: "Alt-ArrowLeft", mac: "Ctrl-ArrowLeft", run: cursorSyntaxLeft, shift: selectSyntaxLeft },
+    { key: "Alt-ArrowRight", mac: "Ctrl-ArrowRight", run: cursorSyntaxRight, shift: selectSyntaxRight },
+    { key: "Alt-ArrowUp", run: moveLineUp },
+    { key: "Shift-Alt-ArrowUp", run: copyLineUp },
+    { key: "Alt-ArrowDown", run: moveLineDown },
+    { key: "Shift-Alt-ArrowDown", run: copyLineDown },
+    { key: "Escape", run: simplifySelection },
+    { key: "Mod-Enter", run: insertBlankLine },
+    { key: "Alt-l", mac: "Ctrl-l", run: selectLine },
+    { key: "Mod-i", run: selectParentSyntax, preventDefault: true },
+    { key: "Mod-[", run: indentLess },
+    { key: "Mod-]", run: indentMore },
+    { key: "Mod-Alt-\\", run: indentSelection },
+    { key: "Shift-Mod-k", run: deleteLine },
+    { key: "Shift-Mod-\\", run: cursorMatchingBracket },
+    { key: "Mod-/", run: toggleComment },
+    { key: "Alt-A", run: toggleBlockComment }
+].concat(standardKeymap);
+
+const basicNormalize = typeof String.prototype.normalize == "function"
+    ? x => x.normalize("NFKD") : x => x;
+/**
+A search cursor provides an iterator over text matches in a
+document.
+*/
+class SearchCursor {
+    /**
+    Create a text cursor. The query is the search string, `from` to
+    `to` provides the region to search.
+    
+    When `normalize` is given, it will be called, on both the query
+    string and the content it is matched against, before comparing.
+    You can, for example, create a case-insensitive search by
+    passing `s => s.toLowerCase()`.
+    
+    Text is always normalized with
+    [`.normalize("NFKD")`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize)
+    (when supported).
+    */
+    constructor(text, query, from = 0, to = text.length, normalize) {
+        /**
+        The current match (only holds a meaningful value after
+        [`next`](https://codemirror.net/6/docs/ref/#search.SearchCursor.next) has been called and when
+        `done` is false).
+        */
+        this.value = { from: 0, to: 0 };
+        /**
+        Whether the end of the iterated region has been reached.
+        */
+        this.done = false;
+        this.matches = [];
+        this.buffer = "";
+        this.bufferPos = 0;
+        this.iter = text.iterRange(from, to);
+        this.bufferStart = from;
+        this.normalize = normalize ? x => normalize(basicNormalize(x)) : basicNormalize;
+        this.query = this.normalize(query);
+    }
+    peek() {
+        if (this.bufferPos == this.buffer.length) {
+            this.bufferStart += this.buffer.length;
+            this.iter.next();
+            if (this.iter.done)
+                return -1;
+            this.bufferPos = 0;
+            this.buffer = this.iter.value;
+        }
+        return codePointAt(this.buffer, this.bufferPos);
+    }
+    /**
+    Look for the next match. Updates the iterator's
+    [`value`](https://codemirror.net/6/docs/ref/#search.SearchCursor.value) and
+    [`done`](https://codemirror.net/6/docs/ref/#search.SearchCursor.done) properties. Should be called
+    at least once before using the cursor.
+    */
+    next() {
+        while (this.matches.length)
+            this.matches.pop();
+        return this.nextOverlapping();
+    }
+    /**
+    The `next` method will ignore matches that partially overlap a
+    previous match. This method behaves like `next`, but includes
+    such matches.
+    */
+    nextOverlapping() {
+        for (;;) {
+            let next = this.peek();
+            if (next < 0) {
+                this.done = true;
+                return this;
+            }
+            let str = fromCodePoint(next), start = this.bufferStart + this.bufferPos;
+            this.bufferPos += codePointSize(next);
+            let norm = this.normalize(str);
+            for (let i = 0, pos = start;; i++) {
+                let code = norm.charCodeAt(i);
+                let match = this.match(code, pos);
+                if (match) {
+                    this.value = match;
+                    return this;
+                }
+                if (i == norm.length - 1)
+                    break;
+                if (pos == start && i < str.length && str.charCodeAt(i) == code)
+                    pos++;
+            }
+        }
+    }
+    match(code, pos) {
+        let match = null;
+        for (let i = 0; i < this.matches.length; i += 2) {
+            let index = this.matches[i], keep = false;
+            if (this.query.charCodeAt(index) == code) {
+                if (index == this.query.length - 1) {
+                    match = { from: this.matches[i + 1], to: pos + 1 };
+                }
+                else {
+                    this.matches[i]++;
+                    keep = true;
+                }
+            }
+            if (!keep) {
+                this.matches.splice(i, 2);
+                i -= 2;
+            }
+        }
+        if (this.query.charCodeAt(0) == code) {
+            if (this.query.length == 1)
+                match = { from: pos, to: pos + 1 };
+            else
+                this.matches.push(1, pos);
+        }
+        return match;
+    }
+}
+if (typeof Symbol != "undefined")
+    SearchCursor.prototype[Symbol.iterator] = function () { return this; };
+
+const defaultHighlightOptions = {
+    highlightWordAroundCursor: false,
+    minSelectionLength: 1,
+    maxMatches: 100,
+    wholeWords: false
+};
+const highlightConfig = /*@__PURE__*/Facet.define({
+    combine(options) {
+        return combineConfig(options, defaultHighlightOptions, {
+            highlightWordAroundCursor: (a, b) => a || b,
+            minSelectionLength: Math.min,
+            maxMatches: Math.min
+        });
+    }
+});
+/**
+This extension highlights text that matches the selection. It uses
+the `"cm-selectionMatch"` class for the highlighting. When
+`highlightWordAroundCursor` is enabled, the word at the cursor
+itself will be highlighted with `"cm-selectionMatch-main"`.
+*/
+function highlightSelectionMatches(options) {
+    let ext = [defaultTheme, matchHighlighter];
+    if (options)
+        ext.push(highlightConfig.of(options));
+    return ext;
+}
+const matchDeco = /*@__PURE__*/Decoration.mark({ class: "cm-selectionMatch" });
+const mainMatchDeco = /*@__PURE__*/Decoration.mark({ class: "cm-selectionMatch cm-selectionMatch-main" });
+// Whether the characters directly outside the given positions are non-word characters
+function insideWordBoundaries(check, state, from, to) {
+    return (from == 0 || check(state.sliceDoc(from - 1, from)) != CharCategory.Word) &&
+        (to == state.doc.length || check(state.sliceDoc(to, to + 1)) != CharCategory.Word);
+}
+// Whether the characters directly at the given positions are word characters
+function insideWord(check, state, from, to) {
+    return check(state.sliceDoc(from, from + 1)) == CharCategory.Word
+        && check(state.sliceDoc(to - 1, to)) == CharCategory.Word;
+}
+const matchHighlighter = /*@__PURE__*/ViewPlugin.fromClass(class {
+    constructor(view) {
+        this.decorations = this.getDeco(view);
+    }
+    update(update) {
+        if (update.selectionSet || update.docChanged || update.viewportChanged)
+            this.decorations = this.getDeco(update.view);
+    }
+    getDeco(view) {
+        let conf = view.state.facet(highlightConfig);
+        let { state } = view, sel = state.selection;
+        if (sel.ranges.length > 1)
+            return Decoration.none;
+        let range = sel.main, query, check = null;
+        if (range.empty) {
+            if (!conf.highlightWordAroundCursor)
+                return Decoration.none;
+            let word = state.wordAt(range.head);
+            if (!word)
+                return Decoration.none;
+            check = state.charCategorizer(range.head);
+            query = state.sliceDoc(word.from, word.to);
+        }
+        else {
+            let len = range.to - range.from;
+            if (len < conf.minSelectionLength || len > 200)
+                return Decoration.none;
+            if (conf.wholeWords) {
+                query = state.sliceDoc(range.from, range.to); // TODO: allow and include leading/trailing space?
+                check = state.charCategorizer(range.head);
+                if (!(insideWordBoundaries(check, state, range.from, range.to)
+                    && insideWord(check, state, range.from, range.to)))
+                    return Decoration.none;
+            }
+            else {
+                query = state.sliceDoc(range.from, range.to).trim();
+                if (!query)
+                    return Decoration.none;
+            }
+        }
+        let deco = [];
+        for (let part of view.visibleRanges) {
+            let cursor = new SearchCursor(state.doc, query, part.from, part.to);
+            while (!cursor.next().done) {
+                let { from, to } = cursor.value;
+                if (!check || insideWordBoundaries(check, state, from, to)) {
+                    if (range.empty && from <= range.from && to >= range.to)
+                        deco.push(mainMatchDeco.range(from, to));
+                    else if (from >= range.to || to <= range.from)
+                        deco.push(matchDeco.range(from, to));
+                    if (deco.length > conf.maxMatches)
+                        return Decoration.none;
+                }
+            }
+        }
+        return Decoration.set(deco);
+    }
+}, {
+    decorations: v => v.decorations
+});
+const defaultTheme = /*@__PURE__*/EditorView.baseTheme({
+    ".cm-selectionMatch": { backgroundColor: "#99ff7780" },
+    ".cm-searchMatch .cm-selectionMatch": { backgroundColor: "transparent" }
+});
+
+/**
+An instance of this is passed to completion source functions.
+*/
+class CompletionContext {
+    /**
+    Create a new completion context. (Mostly useful for testing
+    completion sources—in the editor, the extension will create
+    these for you.)
+    */
+    constructor(
+    /**
+    The editor state that the completion happens in.
+    */
+    state, 
+    /**
+    The position at which the completion is happening.
+    */
+    pos, 
+    /**
+    Indicates whether completion was activated explicitly, or
+    implicitly by typing. The usual way to respond to this is to
+    only return completions when either there is part of a
+    completable entity before the cursor, or `explicit` is true.
+    */
+    explicit) {
+        this.state = state;
+        this.pos = pos;
+        this.explicit = explicit;
+        /**
+        @internal
+        */
+        this.abortListeners = [];
+    }
+    /**
+    Get the extent, content, and (if there is a token) type of the
+    token before `this.pos`.
+    */
+    tokenBefore(types) {
+        let token = syntaxTree(this.state).resolveInner(this.pos, -1);
+        while (token && types.indexOf(token.name) < 0)
+            token = token.parent;
+        return token ? { from: token.from, to: this.pos,
+            text: this.state.sliceDoc(token.from, this.pos),
+            type: token.type } : null;
+    }
+    /**
+    Get the match of the given expression directly before the
+    cursor.
+    */
+    matchBefore(expr) {
+        let line = this.state.doc.lineAt(this.pos);
+        let start = Math.max(line.from, this.pos - 250);
+        let str = line.text.slice(start - line.from, this.pos - line.from);
+        let found = str.search(ensureAnchor(expr, false));
+        return found < 0 ? null : { from: start + found, to: this.pos, text: str.slice(found) };
+    }
+    /**
+    Yields true when the query has been aborted. Can be useful in
+    asynchronous queries to avoid doing work that will be ignored.
+    */
+    get aborted() { return this.abortListeners == null; }
+    /**
+    Allows you to register abort handlers, which will be called when
+    the query is
+    [aborted](https://codemirror.net/6/docs/ref/#autocomplete.CompletionContext.aborted).
+    */
+    addEventListener(type, listener) {
+        if (type == "abort" && this.abortListeners)
+            this.abortListeners.push(listener);
+    }
+}
+function toSet(chars) {
+    let flat = Object.keys(chars).join("");
+    let words = /\w/.test(flat);
+    if (words)
+        flat = flat.replace(/\w/g, "");
+    return `[${words ? "\\w" : ""}${flat.replace(/[^\w\s]/g, "\\$&")}]`;
+}
+function prefixMatch(options) {
+    let first = Object.create(null), rest = Object.create(null);
+    for (let { label } of options) {
+        first[label[0]] = true;
+        for (let i = 1; i < label.length; i++)
+            rest[label[i]] = true;
+    }
+    let source = toSet(first) + toSet(rest) + "*$";
+    return [new RegExp("^" + source), new RegExp(source)];
+}
+/**
+Given a a fixed array of options, return an autocompleter that
+completes them.
+*/
+function completeFromList(list) {
+    let options = list.map(o => typeof o == "string" ? { label: o } : o);
+    let [validFor, match] = options.every(o => /^\w+$/.test(o.label)) ? [/\w*$/, /\w+$/] : prefixMatch(options);
+    return (context) => {
+        let token = context.matchBefore(match);
+        return token || context.explicit ? { from: token ? token.from : context.pos, options, validFor } : null;
+    };
+}
+/**
+Wrap the given completion source so that it will not fire when the
+cursor is in a syntax node with one of the given names.
+*/
+function ifNotIn(nodes, source) {
+    return (context) => {
+        for (let pos = syntaxTree(context.state).resolveInner(context.pos, -1); pos; pos = pos.parent)
+            if (nodes.indexOf(pos.name) > -1)
+                return null;
+        return source(context);
+    };
+}
+class Option {
+    constructor(completion, source, match) {
+        this.completion = completion;
+        this.source = source;
+        this.match = match;
+    }
+}
+function cur(state) { return state.selection.main.head; }
+// Make sure the given regexp has a $ at its end and, if `start` is
+// true, a ^ at its start.
+function ensureAnchor(expr, start) {
+    var _a;
+    let { source } = expr;
+    let addStart = start && source[0] != "^", addEnd = source[source.length - 1] != "$";
+    if (!addStart && !addEnd)
+        return expr;
+    return new RegExp(`${addStart ? "^" : ""}(?:${source})${addEnd ? "$" : ""}`, (_a = expr.flags) !== null && _a !== void 0 ? _a : (expr.ignoreCase ? "i" : ""));
+}
+/**
+Helper function that returns a transaction spec which inserts a
+completion's text in the main selection range, and any other
+selection range that has the same text in front of it.
+*/
+function insertCompletionText(state, text, from, to) {
+    return Object.assign(Object.assign({}, state.changeByRange(range => {
+        if (range == state.selection.main)
+            return {
+                changes: { from: from, to: to, insert: text },
+                range: EditorSelection.cursor(from + text.length)
+            };
+        let len = to - from;
+        if (!range.empty ||
+            len && state.sliceDoc(range.from - len, range.from) != state.sliceDoc(from, to))
+            return { range };
+        return {
+            changes: { from: range.from - len, to: range.from, insert: text },
+            range: EditorSelection.cursor(range.from - len + text.length)
+        };
+    })), { userEvent: "input.complete" });
+}
+function applyCompletion(view, option) {
+    const apply = option.completion.apply || option.completion.label;
+    let result = option.source;
+    if (typeof apply == "string")
+        view.dispatch(insertCompletionText(view.state, apply, result.from, result.to));
+    else
+        apply(view, option.completion, result.from, result.to);
+}
+const SourceCache = /*@__PURE__*/new WeakMap();
+function asSource(source) {
+    if (!Array.isArray(source))
+        return source;
+    let known = SourceCache.get(source);
+    if (!known)
+        SourceCache.set(source, known = completeFromList(source));
+    return known;
+}
+
+// A pattern matcher for fuzzy completion matching. Create an instance
+// once for a pattern, and then use that to match any number of
+// completions.
+class FuzzyMatcher {
+    constructor(pattern) {
+        this.pattern = pattern;
+        this.chars = [];
+        this.folded = [];
+        // Buffers reused by calls to `match` to track matched character
+        // positions.
+        this.any = [];
+        this.precise = [];
+        this.byWord = [];
+        for (let p = 0; p < pattern.length;) {
+            let char = codePointAt(pattern, p), size = codePointSize(char);
+            this.chars.push(char);
+            let part = pattern.slice(p, p + size), upper = part.toUpperCase();
+            this.folded.push(codePointAt(upper == part ? part.toLowerCase() : upper, 0));
+            p += size;
+        }
+        this.astral = pattern.length != this.chars.length;
+    }
+    // Matches a given word (completion) against the pattern (input).
+    // Will return null for no match, and otherwise an array that starts
+    // with the match score, followed by any number of `from, to` pairs
+    // indicating the matched parts of `word`.
+    //
+    // The score is a number that is more negative the worse the match
+    // is. See `Penalty` above.
+    match(word) {
+        if (this.pattern.length == 0)
+            return [0];
+        if (word.length < this.pattern.length)
+            return null;
+        let { chars, folded, any, precise, byWord } = this;
+        // For single-character queries, only match when they occur right
+        // at the start
+        if (chars.length == 1) {
+            let first = codePointAt(word, 0);
+            return first == chars[0] ? [0, 0, codePointSize(first)]
+                : first == folded[0] ? [-200 /* CaseFold */, 0, codePointSize(first)] : null;
+        }
+        let direct = word.indexOf(this.pattern);
+        if (direct == 0)
+            return [0, 0, this.pattern.length];
+        let len = chars.length, anyTo = 0;
+        if (direct < 0) {
+            for (let i = 0, e = Math.min(word.length, 200); i < e && anyTo < len;) {
+                let next = codePointAt(word, i);
+                if (next == chars[anyTo] || next == folded[anyTo])
+                    any[anyTo++] = i;
+                i += codePointSize(next);
+            }
+            // No match, exit immediately
+            if (anyTo < len)
+                return null;
+        }
+        // This tracks the extent of the precise (non-folded, not
+        // necessarily adjacent) match
+        let preciseTo = 0;
+        // Tracks whether there is a match that hits only characters that
+        // appear to be starting words. `byWordFolded` is set to true when
+        // a case folded character is encountered in such a match
+        let byWordTo = 0, byWordFolded = false;
+        // If we've found a partial adjacent match, these track its state
+        let adjacentTo = 0, adjacentStart = -1, adjacentEnd = -1;
+        let hasLower = /[a-z]/.test(word), wordAdjacent = true;
+        // Go over the option's text, scanning for the various kinds of matches
+        for (let i = 0, e = Math.min(word.length, 200), prevType = 0 /* NonWord */; i < e && byWordTo < len;) {
+            let next = codePointAt(word, i);
+            if (direct < 0) {
+                if (preciseTo < len && next == chars[preciseTo])
+                    precise[preciseTo++] = i;
+                if (adjacentTo < len) {
+                    if (next == chars[adjacentTo] || next == folded[adjacentTo]) {
+                        if (adjacentTo == 0)
+                            adjacentStart = i;
+                        adjacentEnd = i + 1;
+                        adjacentTo++;
+                    }
+                    else {
+                        adjacentTo = 0;
+                    }
+                }
+            }
+            let ch, type = next < 0xff
+                ? (next >= 48 && next <= 57 || next >= 97 && next <= 122 ? 2 /* Lower */ : next >= 65 && next <= 90 ? 1 /* Upper */ : 0 /* NonWord */)
+                : ((ch = fromCodePoint(next)) != ch.toLowerCase() ? 1 /* Upper */ : ch != ch.toUpperCase() ? 2 /* Lower */ : 0 /* NonWord */);
+            if (!i || type == 1 /* Upper */ && hasLower || prevType == 0 /* NonWord */ && type != 0 /* NonWord */) {
+                if (chars[byWordTo] == next || (folded[byWordTo] == next && (byWordFolded = true)))
+                    byWord[byWordTo++] = i;
+                else if (byWord.length)
+                    wordAdjacent = false;
+            }
+            prevType = type;
+            i += codePointSize(next);
+        }
+        if (byWordTo == len && byWord[0] == 0 && wordAdjacent)
+            return this.result(-100 /* ByWord */ + (byWordFolded ? -200 /* CaseFold */ : 0), byWord, word);
+        if (adjacentTo == len && adjacentStart == 0)
+            return [-200 /* CaseFold */ - word.length, 0, adjacentEnd];
+        if (direct > -1)
+            return [-700 /* NotStart */ - word.length, direct, direct + this.pattern.length];
+        if (adjacentTo == len)
+            return [-200 /* CaseFold */ + -700 /* NotStart */ - word.length, adjacentStart, adjacentEnd];
+        if (byWordTo == len)
+            return this.result(-100 /* ByWord */ + (byWordFolded ? -200 /* CaseFold */ : 0) + -700 /* NotStart */ +
+                (wordAdjacent ? 0 : -1100 /* Gap */), byWord, word);
+        return chars.length == 2 ? null : this.result((any[0] ? -700 /* NotStart */ : 0) + -200 /* CaseFold */ + -1100 /* Gap */, any, word);
+    }
+    result(score, positions, word) {
+        let result = [score - word.length], i = 1;
+        for (let pos of positions) {
+            let to = pos + (this.astral ? codePointSize(codePointAt(word, pos)) : 1);
+            if (i > 1 && result[i - 1] == pos)
+                result[i - 1] = to;
+            else {
+                result[i++] = pos;
+                result[i++] = to;
+            }
+        }
+        return result;
+    }
+}
+
+const completionConfig = /*@__PURE__*/Facet.define({
+    combine(configs) {
+        return combineConfig(configs, {
+            activateOnTyping: true,
+            selectOnOpen: true,
+            override: null,
+            closeOnBlur: true,
+            maxRenderedOptions: 100,
+            defaultKeymap: true,
+            optionClass: () => "",
+            aboveCursor: false,
+            icons: true,
+            addToOptions: [],
+            compareCompletions: (a, b) => a.label.localeCompare(b.label)
+        }, {
+            defaultKeymap: (a, b) => a && b,
+            closeOnBlur: (a, b) => a && b,
+            icons: (a, b) => a && b,
+            optionClass: (a, b) => c => joinClass(a(c), b(c)),
+            addToOptions: (a, b) => a.concat(b)
+        });
+    }
+});
+function joinClass(a, b) {
+    return a ? b ? a + " " + b : a : b;
+}
+
+function optionContent(config) {
+    let content = config.addToOptions.slice();
+    if (config.icons)
+        content.push({
+            render(completion) {
+                let icon = document.createElement("div");
+                icon.classList.add("cm-completionIcon");
+                if (completion.type)
+                    icon.classList.add(...completion.type.split(/\s+/g).map(cls => "cm-completionIcon-" + cls));
+                icon.setAttribute("aria-hidden", "true");
+                return icon;
+            },
+            position: 20
+        });
+    content.push({
+        render(completion, _s, match) {
+            let labelElt = document.createElement("span");
+            labelElt.className = "cm-completionLabel";
+            let { label } = completion, off = 0;
+            for (let j = 1; j < match.length;) {
+                let from = match[j++], to = match[j++];
+                if (from > off)
+                    labelElt.appendChild(document.createTextNode(label.slice(off, from)));
+                let span = labelElt.appendChild(document.createElement("span"));
+                span.appendChild(document.createTextNode(label.slice(from, to)));
+                span.className = "cm-completionMatchedText";
+                off = to;
+            }
+            if (off < label.length)
+                labelElt.appendChild(document.createTextNode(label.slice(off)));
+            return labelElt;
+        },
+        position: 50
+    }, {
+        render(completion) {
+            if (!completion.detail)
+                return null;
+            let detailElt = document.createElement("span");
+            detailElt.className = "cm-completionDetail";
+            detailElt.textContent = completion.detail;
+            return detailElt;
+        },
+        position: 80
+    });
+    return content.sort((a, b) => a.position - b.position).map(a => a.render);
+}
+function rangeAroundSelected(total, selected, max) {
+    if (total <= max)
+        return { from: 0, to: total };
+    if (selected < 0)
+        selected = 0;
+    if (selected <= (total >> 1)) {
+        let off = Math.floor(selected / max);
+        return { from: off * max, to: (off + 1) * max };
+    }
+    let off = Math.floor((total - selected) / max);
+    return { from: total - (off + 1) * max, to: total - off * max };
+}
+class CompletionTooltip {
+    constructor(view, stateField) {
+        this.view = view;
+        this.stateField = stateField;
+        this.info = null;
+        this.placeInfo = {
+            read: () => this.measureInfo(),
+            write: (pos) => this.positionInfo(pos),
+            key: this
+        };
+        let cState = view.state.field(stateField);
+        let { options, selected } = cState.open;
+        let config = view.state.facet(completionConfig);
+        this.optionContent = optionContent(config);
+        this.optionClass = config.optionClass;
+        this.range = rangeAroundSelected(options.length, selected, config.maxRenderedOptions);
+        this.dom = document.createElement("div");
+        this.dom.className = "cm-tooltip-autocomplete";
+        this.dom.addEventListener("mousedown", (e) => {
+            for (let dom = e.target, match; dom && dom != this.dom; dom = dom.parentNode) {
+                if (dom.nodeName == "LI" && (match = /-(\d+)$/.exec(dom.id)) && +match[1] < options.length) {
+                    applyCompletion(view, options[+match[1]]);
+                    e.preventDefault();
+                    return;
+                }
+            }
+        });
+        this.list = this.dom.appendChild(this.createListBox(options, cState.id, this.range));
+        this.list.addEventListener("scroll", () => {
+            if (this.info)
+                this.view.requestMeasure(this.placeInfo);
+        });
+    }
+    mount() { this.updateSel(); }
+    update(update) {
+        if (update.state.field(this.stateField) != update.startState.field(this.stateField))
+            this.updateSel();
+    }
+    positioned() {
+        if (this.info)
+            this.view.requestMeasure(this.placeInfo);
+    }
+    updateSel() {
+        let cState = this.view.state.field(this.stateField), open = cState.open;
+        if (open.selected < this.range.from || open.selected >= this.range.to) {
+            this.range = rangeAroundSelected(open.options.length, open.selected, this.view.state.facet(completionConfig).maxRenderedOptions);
+            this.list.remove();
+            this.list = this.dom.appendChild(this.createListBox(open.options, cState.id, this.range));
+            this.list.addEventListener("scroll", () => {
+                if (this.info)
+                    this.view.requestMeasure(this.placeInfo);
+            });
+        }
+        if (this.updateSelectedOption(open.selected)) {
+            if (this.info) {
+                this.info.remove();
+                this.info = null;
+            }
+            let { completion } = open.options[open.selected];
+            let { info } = completion;
+            if (!info)
+                return;
+            let infoResult = typeof info === 'string' ? document.createTextNode(info) : info(completion);
+            if (!infoResult)
+                return;
+            if ('then' in infoResult) {
+                infoResult.then(node => {
+                    if (node && this.view.state.field(this.stateField, false) == cState)
+                        this.addInfoPane(node);
+                }).catch(e => logException(this.view.state, e, "completion info"));
+            }
+            else {
+                this.addInfoPane(infoResult);
+            }
+        }
+    }
+    addInfoPane(content) {
+        let dom = this.info = document.createElement("div");
+        dom.className = "cm-tooltip cm-completionInfo";
+        dom.appendChild(content);
+        this.dom.appendChild(dom);
+        this.view.requestMeasure(this.placeInfo);
+    }
+    updateSelectedOption(selected) {
+        let set = null;
+        for (let opt = this.list.firstChild, i = this.range.from; opt; opt = opt.nextSibling, i++) {
+            if (i == selected) {
+                if (!opt.hasAttribute("aria-selected")) {
+                    opt.setAttribute("aria-selected", "true");
+                    set = opt;
+                }
+            }
+            else {
+                if (opt.hasAttribute("aria-selected"))
+                    opt.removeAttribute("aria-selected");
+            }
+        }
+        if (set)
+            scrollIntoView(this.list, set);
+        return set;
+    }
+    measureInfo() {
+        let sel = this.dom.querySelector("[aria-selected]");
+        if (!sel || !this.info)
+            return null;
+        let listRect = this.dom.getBoundingClientRect();
+        let infoRect = this.info.getBoundingClientRect();
+        let selRect = sel.getBoundingClientRect();
+        if (selRect.top > Math.min(innerHeight, listRect.bottom) - 10 || selRect.bottom < Math.max(0, listRect.top) + 10)
+            return null;
+        let top = Math.max(0, Math.min(selRect.top, innerHeight - infoRect.height)) - listRect.top;
+        let left = this.view.textDirection == Direction.RTL;
+        let spaceLeft = listRect.left, spaceRight = innerWidth - listRect.right;
+        if (left && spaceLeft < Math.min(infoRect.width, spaceRight))
+            left = false;
+        else if (!left && spaceRight < Math.min(infoRect.width, spaceLeft))
+            left = true;
+        return { top, left };
+    }
+    positionInfo(pos) {
+        if (this.info) {
+            this.info.style.top = (pos ? pos.top : -1e6) + "px";
+            if (pos) {
+                this.info.classList.toggle("cm-completionInfo-left", pos.left);
+                this.info.classList.toggle("cm-completionInfo-right", !pos.left);
+            }
+        }
+    }
+    createListBox(options, id, range) {
+        const ul = document.createElement("ul");
+        ul.id = id;
+        ul.setAttribute("role", "listbox");
+        ul.setAttribute("aria-expanded", "true");
+        ul.setAttribute("aria-label", this.view.state.phrase("Completions"));
+        for (let i = range.from; i < range.to; i++) {
+            let { completion, match } = options[i];
+            const li = ul.appendChild(document.createElement("li"));
+            li.id = id + "-" + i;
+            li.setAttribute("role", "option");
+            let cls = this.optionClass(completion);
+            if (cls)
+                li.className = cls;
+            for (let source of this.optionContent) {
+                let node = source(completion, this.view.state, match);
+                if (node)
+                    li.appendChild(node);
+            }
+        }
+        if (range.from)
+            ul.classList.add("cm-completionListIncompleteTop");
+        if (range.to < options.length)
+            ul.classList.add("cm-completionListIncompleteBottom");
+        return ul;
+    }
+}
+// We allocate a new function instance every time the completion
+// changes to force redrawing/repositioning of the tooltip
+function completionTooltip(stateField) {
+    return (view) => new CompletionTooltip(view, stateField);
+}
+function scrollIntoView(container, element) {
+    let parent = container.getBoundingClientRect();
+    let self = element.getBoundingClientRect();
+    if (self.top < parent.top)
+        container.scrollTop -= parent.top - self.top;
+    else if (self.bottom > parent.bottom)
+        container.scrollTop += self.bottom - parent.bottom;
+}
+
+// Used to pick a preferred option when two options with the same
+// label occur in the result.
+function score(option) {
+    return (option.boost || 0) * 100 + (option.apply ? 10 : 0) + (option.info ? 5 : 0) +
+        (option.type ? 1 : 0);
+}
+function sortOptions(active, state) {
+    let options = [], i = 0;
+    for (let a of active)
+        if (a.hasResult()) {
+            if (a.result.filter === false) {
+                let getMatch = a.result.getMatch;
+                for (let option of a.result.options) {
+                    let match = [1e9 - i++];
+                    if (getMatch)
+                        for (let n of getMatch(option))
+                            match.push(n);
+                    options.push(new Option(option, a, match));
+                }
+            }
+            else {
+                let matcher = new FuzzyMatcher(state.sliceDoc(a.from, a.to)), match;
+                for (let option of a.result.options)
+                    if (match = matcher.match(option.label)) {
+                        if (option.boost != null)
+                            match[0] += option.boost;
+                        options.push(new Option(option, a, match));
+                    }
+            }
+        }
+    let result = [], prev = null;
+    let compare = state.facet(completionConfig).compareCompletions;
+    for (let opt of options.sort((a, b) => (b.match[0] - a.match[0]) || compare(a.completion, b.completion))) {
+        if (!prev || prev.label != opt.completion.label || prev.detail != opt.completion.detail ||
+            (prev.type != null && opt.completion.type != null && prev.type != opt.completion.type) ||
+            prev.apply != opt.completion.apply)
+            result.push(opt);
+        else if (score(opt.completion) > score(prev))
+            result[result.length - 1] = opt;
+        prev = opt.completion;
+    }
+    return result;
+}
+class CompletionDialog {
+    constructor(options, attrs, tooltip, timestamp, selected) {
+        this.options = options;
+        this.attrs = attrs;
+        this.tooltip = tooltip;
+        this.timestamp = timestamp;
+        this.selected = selected;
+    }
+    setSelected(selected, id) {
+        return selected == this.selected || selected >= this.options.length ? this
+            : new CompletionDialog(this.options, makeAttrs(id, selected), this.tooltip, this.timestamp, selected);
+    }
+    static build(active, state, id, prev, conf) {
+        let options = sortOptions(active, state);
+        if (!options.length)
+            return null;
+        let selected = state.facet(completionConfig).selectOnOpen ? 0 : -1;
+        if (prev && prev.selected != selected && prev.selected != -1) {
+            let selectedValue = prev.options[prev.selected].completion;
+            for (let i = 0; i < options.length; i++)
+                if (options[i].completion == selectedValue) {
+                    selected = i;
+                    break;
+                }
+        }
+        return new CompletionDialog(options, makeAttrs(id, selected), {
+            pos: active.reduce((a, b) => b.hasResult() ? Math.min(a, b.from) : a, 1e8),
+            create: completionTooltip(completionState),
+            above: conf.aboveCursor,
+        }, prev ? prev.timestamp : Date.now(), selected);
+    }
+    map(changes) {
+        return new CompletionDialog(this.options, this.attrs, Object.assign(Object.assign({}, this.tooltip), { pos: changes.mapPos(this.tooltip.pos) }), this.timestamp, this.selected);
+    }
+}
+class CompletionState {
+    constructor(active, id, open) {
+        this.active = active;
+        this.id = id;
+        this.open = open;
+    }
+    static start() {
+        return new CompletionState(none, "cm-ac-" + Math.floor(Math.random() * 2e6).toString(36), null);
+    }
+    update(tr) {
+        let { state } = tr, conf = state.facet(completionConfig);
+        let sources = conf.override ||
+            state.languageDataAt("autocomplete", cur(state)).map(asSource);
+        let active = sources.map(source => {
+            let value = this.active.find(s => s.source == source) ||
+                new ActiveSource(source, this.active.some(a => a.state != 0 /* Inactive */) ? 1 /* Pending */ : 0 /* Inactive */);
+            return value.update(tr, conf);
+        });
+        if (active.length == this.active.length && active.every((a, i) => a == this.active[i]))
+            active = this.active;
+        let open = tr.selection || active.some(a => a.hasResult() && tr.changes.touchesRange(a.from, a.to)) ||
+            !sameResults(active, this.active) ? CompletionDialog.build(active, state, this.id, this.open, conf)
+            : this.open && tr.docChanged ? this.open.map(tr.changes) : this.open;
+        if (!open && active.every(a => a.state != 1 /* Pending */) && active.some(a => a.hasResult()))
+            active = active.map(a => a.hasResult() ? new ActiveSource(a.source, 0 /* Inactive */) : a);
+        for (let effect of tr.effects)
+            if (effect.is(setSelectedEffect))
+                open = open && open.setSelected(effect.value, this.id);
+        return active == this.active && open == this.open ? this : new CompletionState(active, this.id, open);
+    }
+    get tooltip() { return this.open ? this.open.tooltip : null; }
+    get attrs() { return this.open ? this.open.attrs : baseAttrs; }
+}
+function sameResults(a, b) {
+    if (a == b)
+        return true;
+    for (let iA = 0, iB = 0;;) {
+        while (iA < a.length && !a[iA].hasResult)
+            iA++;
+        while (iB < b.length && !b[iB].hasResult)
+            iB++;
+        let endA = iA == a.length, endB = iB == b.length;
+        if (endA || endB)
+            return endA == endB;
+        if (a[iA++].result != b[iB++].result)
+            return false;
+    }
+}
+const baseAttrs = {
+    "aria-autocomplete": "list"
+};
+function makeAttrs(id, selected) {
+    let result = {
+        "aria-autocomplete": "list",
+        "aria-haspopup": "listbox",
+        "aria-controls": id
+    };
+    if (selected > -1)
+        result["aria-activedescendant"] = id + "-" + selected;
+    return result;
+}
+const none = [];
+function getUserEvent(tr) {
+    return tr.isUserEvent("input.type") ? "input" : tr.isUserEvent("delete.backward") ? "delete" : null;
+}
+class ActiveSource {
+    constructor(source, state, explicitPos = -1) {
+        this.source = source;
+        this.state = state;
+        this.explicitPos = explicitPos;
+    }
+    hasResult() { return false; }
+    update(tr, conf) {
+        let event = getUserEvent(tr), value = this;
+        if (event)
+            value = value.handleUserEvent(tr, event, conf);
+        else if (tr.docChanged)
+            value = value.handleChange(tr);
+        else if (tr.selection && value.state != 0 /* Inactive */)
+            value = new ActiveSource(value.source, 0 /* Inactive */);
+        for (let effect of tr.effects) {
+            if (effect.is(startCompletionEffect))
+                value = new ActiveSource(value.source, 1 /* Pending */, effect.value ? cur(tr.state) : -1);
+            else if (effect.is(closeCompletionEffect))
+                value = new ActiveSource(value.source, 0 /* Inactive */);
+            else if (effect.is(setActiveEffect))
+                for (let active of effect.value)
+                    if (active.source == value.source)
+                        value = active;
+        }
+        return value;
+    }
+    handleUserEvent(tr, type, conf) {
+        return type == "delete" || !conf.activateOnTyping ? this.map(tr.changes) : new ActiveSource(this.source, 1 /* Pending */);
+    }
+    handleChange(tr) {
+        return tr.changes.touchesRange(cur(tr.startState)) ? new ActiveSource(this.source, 0 /* Inactive */) : this.map(tr.changes);
+    }
+    map(changes) {
+        return changes.empty || this.explicitPos < 0 ? this : new ActiveSource(this.source, this.state, changes.mapPos(this.explicitPos));
+    }
+}
+class ActiveResult extends ActiveSource {
+    constructor(source, explicitPos, result, from, to) {
+        super(source, 2 /* Result */, explicitPos);
+        this.result = result;
+        this.from = from;
+        this.to = to;
+    }
+    hasResult() { return true; }
+    handleUserEvent(tr, type, conf) {
+        var _a;
+        let from = tr.changes.mapPos(this.from), to = tr.changes.mapPos(this.to, 1);
+        let pos = cur(tr.state);
+        if ((this.explicitPos < 0 ? pos <= from : pos < this.from) ||
+            pos > to ||
+            type == "delete" && cur(tr.startState) == this.from)
+            return new ActiveSource(this.source, type == "input" && conf.activateOnTyping ? 1 /* Pending */ : 0 /* Inactive */);
+        let explicitPos = this.explicitPos < 0 ? -1 : tr.changes.mapPos(this.explicitPos), updated;
+        if (checkValid(this.result.validFor, tr.state, from, to))
+            return new ActiveResult(this.source, explicitPos, this.result, from, to);
+        if (this.result.update &&
+            (updated = this.result.update(this.result, from, to, new CompletionContext(tr.state, pos, explicitPos >= 0))))
+            return new ActiveResult(this.source, explicitPos, updated, updated.from, (_a = updated.to) !== null && _a !== void 0 ? _a : cur(tr.state));
+        return new ActiveSource(this.source, 1 /* Pending */, explicitPos);
+    }
+    handleChange(tr) {
+        return tr.changes.touchesRange(this.from, this.to) ? new ActiveSource(this.source, 0 /* Inactive */) : this.map(tr.changes);
+    }
+    map(mapping) {
+        return mapping.empty ? this :
+            new ActiveResult(this.source, this.explicitPos < 0 ? -1 : mapping.mapPos(this.explicitPos), this.result, mapping.mapPos(this.from), mapping.mapPos(this.to, 1));
+    }
+}
+function checkValid(validFor, state, from, to) {
+    if (!validFor)
+        return false;
+    let text = state.sliceDoc(from, to);
+    return typeof validFor == "function" ? validFor(text, from, to, state) : ensureAnchor(validFor, true).test(text);
+}
+const startCompletionEffect = /*@__PURE__*/StateEffect.define();
+const closeCompletionEffect = /*@__PURE__*/StateEffect.define();
+const setActiveEffect = /*@__PURE__*/StateEffect.define({
+    map(sources, mapping) { return sources.map(s => s.map(mapping)); }
+});
+const setSelectedEffect = /*@__PURE__*/StateEffect.define();
+const completionState = /*@__PURE__*/StateField.define({
+    create() { return CompletionState.start(); },
+    update(value, tr) { return value.update(tr); },
+    provide: f => [
+        showTooltip.from(f, val => val.tooltip),
+        EditorView.contentAttributes.from(f, state => state.attrs)
+    ]
+});
+
+const CompletionInteractMargin = 75;
+/**
+Returns a command that moves the completion selection forward or
+backward by the given amount.
+*/
+function moveCompletionSelection(forward, by = "option") {
+    return (view) => {
+        let cState = view.state.field(completionState, false);
+        if (!cState || !cState.open || Date.now() - cState.open.timestamp < CompletionInteractMargin)
+            return false;
+        let step = 1, tooltip;
+        if (by == "page" && (tooltip = getTooltip(view, cState.open.tooltip)))
+            step = Math.max(2, Math.floor(tooltip.dom.offsetHeight /
+                tooltip.dom.querySelector("li").offsetHeight) - 1);
+        let { length } = cState.open.options;
+        let selected = cState.open.selected > -1 ? cState.open.selected + step * (forward ? 1 : -1) : forward ? 0 : length - 1;
+        if (selected < 0)
+            selected = by == "page" ? 0 : length - 1;
+        else if (selected >= length)
+            selected = by == "page" ? length - 1 : 0;
+        view.dispatch({ effects: setSelectedEffect.of(selected) });
+        return true;
+    };
+}
+/**
+Accept the current completion.
+*/
+const acceptCompletion = (view) => {
+    let cState = view.state.field(completionState, false);
+    if (view.state.readOnly || !cState || !cState.open || Date.now() - cState.open.timestamp < CompletionInteractMargin ||
+        cState.open.selected < 0)
+        return false;
+    applyCompletion(view, cState.open.options[cState.open.selected]);
+    return true;
+};
+/**
+Explicitly start autocompletion.
+*/
+const startCompletion = (view) => {
+    let cState = view.state.field(completionState, false);
+    if (!cState)
+        return false;
+    view.dispatch({ effects: startCompletionEffect.of(true) });
+    return true;
+};
+/**
+Close the currently active completion.
+*/
+const closeCompletion = (view) => {
+    let cState = view.state.field(completionState, false);
+    if (!cState || !cState.active.some(a => a.state != 0 /* Inactive */))
+        return false;
+    view.dispatch({ effects: closeCompletionEffect.of(null) });
+    return true;
+};
+class RunningQuery {
+    constructor(active, context) {
+        this.active = active;
+        this.context = context;
+        this.time = Date.now();
+        this.updates = [];
+        // Note that 'undefined' means 'not done yet', whereas 'null' means
+        // 'query returned null'.
+        this.done = undefined;
+    }
+}
+const DebounceTime = 50, MaxUpdateCount = 50, MinAbortTime = 1000;
+const completionPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
+    constructor(view) {
+        this.view = view;
+        this.debounceUpdate = -1;
+        this.running = [];
+        this.debounceAccept = -1;
+        this.composing = 0 /* None */;
+        for (let active of view.state.field(completionState).active)
+            if (active.state == 1 /* Pending */)
+                this.startQuery(active);
+    }
+    update(update) {
+        let cState = update.state.field(completionState);
+        if (!update.selectionSet && !update.docChanged && update.startState.field(completionState) == cState)
+            return;
+        let doesReset = update.transactions.some(tr => {
+            return (tr.selection || tr.docChanged) && !getUserEvent(tr);
+        });
+        for (let i = 0; i < this.running.length; i++) {
+            let query = this.running[i];
+            if (doesReset ||
+                query.updates.length + update.transactions.length > MaxUpdateCount && Date.now() - query.time > MinAbortTime) {
+                for (let handler of query.context.abortListeners) {
+                    try {
+                        handler();
+                    }
+                    catch (e) {
+                        logException(this.view.state, e);
+                    }
+                }
+                query.context.abortListeners = null;
+                this.running.splice(i--, 1);
+            }
+            else {
+                query.updates.push(...update.transactions);
+            }
+        }
+        if (this.debounceUpdate > -1)
+            clearTimeout(this.debounceUpdate);
+        this.debounceUpdate = cState.active.some(a => a.state == 1 /* Pending */ && !this.running.some(q => q.active.source == a.source))
+            ? setTimeout(() => this.startUpdate(), DebounceTime) : -1;
+        if (this.composing != 0 /* None */)
+            for (let tr of update.transactions) {
+                if (getUserEvent(tr) == "input")
+                    this.composing = 2 /* Changed */;
+                else if (this.composing == 2 /* Changed */ && tr.selection)
+                    this.composing = 3 /* ChangedAndMoved */;
+            }
+    }
+    startUpdate() {
+        this.debounceUpdate = -1;
+        let { state } = this.view, cState = state.field(completionState);
+        for (let active of cState.active) {
+            if (active.state == 1 /* Pending */ && !this.running.some(r => r.active.source == active.source))
+                this.startQuery(active);
+        }
+    }
+    startQuery(active) {
+        let { state } = this.view, pos = cur(state);
+        let context = new CompletionContext(state, pos, active.explicitPos == pos);
+        let pending = new RunningQuery(active, context);
+        this.running.push(pending);
+        Promise.resolve(active.source(context)).then(result => {
+            if (!pending.context.aborted) {
+                pending.done = result || null;
+                this.scheduleAccept();
+            }
+        }, err => {
+            this.view.dispatch({ effects: closeCompletionEffect.of(null) });
+            logException(this.view.state, err);
+        });
+    }
+    scheduleAccept() {
+        if (this.running.every(q => q.done !== undefined))
+            this.accept();
+        else if (this.debounceAccept < 0)
+            this.debounceAccept = setTimeout(() => this.accept(), DebounceTime);
+    }
+    // For each finished query in this.running, try to create a result
+    // or, if appropriate, restart the query.
+    accept() {
+        var _a;
+        if (this.debounceAccept > -1)
+            clearTimeout(this.debounceAccept);
+        this.debounceAccept = -1;
+        let updated = [];
+        let conf = this.view.state.facet(completionConfig);
+        for (let i = 0; i < this.running.length; i++) {
+            let query = this.running[i];
+            if (query.done === undefined)
+                continue;
+            this.running.splice(i--, 1);
+            if (query.done) {
+                let active = new ActiveResult(query.active.source, query.active.explicitPos, query.done, query.done.from, (_a = query.done.to) !== null && _a !== void 0 ? _a : cur(query.updates.length ? query.updates[0].startState : this.view.state));
+                // Replay the transactions that happened since the start of
+                // the request and see if that preserves the result
+                for (let tr of query.updates)
+                    active = active.update(tr, conf);
+                if (active.hasResult()) {
+                    updated.push(active);
+                    continue;
+                }
+            }
+            let current = this.view.state.field(completionState).active.find(a => a.source == query.active.source);
+            if (current && current.state == 1 /* Pending */) {
+                if (query.done == null) {
+                    // Explicitly failed. Should clear the pending status if it
+                    // hasn't been re-set in the meantime.
+                    let active = new ActiveSource(query.active.source, 0 /* Inactive */);
+                    for (let tr of query.updates)
+                        active = active.update(tr, conf);
+                    if (active.state != 1 /* Pending */)
+                        updated.push(active);
+                }
+                else {
+                    // Cleared by subsequent transactions. Restart.
+                    this.startQuery(current);
+                }
+            }
+        }
+        if (updated.length)
+            this.view.dispatch({ effects: setActiveEffect.of(updated) });
+    }
+}, {
+    eventHandlers: {
+        blur() {
+            let state = this.view.state.field(completionState, false);
+            if (state && state.tooltip && this.view.state.facet(completionConfig).closeOnBlur)
+                this.view.dispatch({ effects: closeCompletionEffect.of(null) });
+        },
+        compositionstart() {
+            this.composing = 1 /* Started */;
+        },
+        compositionend() {
+            if (this.composing == 3 /* ChangedAndMoved */) {
+                // Safari fires compositionend events synchronously, possibly
+                // from inside an update, so dispatch asynchronously to avoid reentrancy
+                setTimeout(() => this.view.dispatch({ effects: startCompletionEffect.of(false) }), 20);
+            }
+            this.composing = 0 /* None */;
+        }
+    }
+});
+
+const baseTheme = /*@__PURE__*/EditorView.baseTheme({
+    ".cm-tooltip.cm-tooltip-autocomplete": {
+        "& > ul": {
+            fontFamily: "monospace",
+            whiteSpace: "nowrap",
+            overflow: "hidden auto",
+            maxWidth_fallback: "700px",
+            maxWidth: "min(700px, 95vw)",
+            minWidth: "250px",
+            maxHeight: "10em",
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            "& > li": {
+                overflowX: "hidden",
+                textOverflow: "ellipsis",
+                cursor: "pointer",
+                padding: "1px 3px",
+                lineHeight: 1.2
+            },
+        }
+    },
+    "&light .cm-tooltip-autocomplete ul li[aria-selected]": {
+        background: "#17c",
+        color: "white",
+    },
+    "&dark .cm-tooltip-autocomplete ul li[aria-selected]": {
+        background: "#347",
+        color: "white",
+    },
+    ".cm-completionListIncompleteTop:before, .cm-completionListIncompleteBottom:after": {
+        content: '"···"',
+        opacity: 0.5,
+        display: "block",
+        textAlign: "center"
+    },
+    ".cm-tooltip.cm-completionInfo": {
+        position: "absolute",
+        padding: "3px 9px",
+        width: "max-content",
+        maxWidth: "300px",
+    },
+    ".cm-completionInfo.cm-completionInfo-left": { right: "100%" },
+    ".cm-completionInfo.cm-completionInfo-right": { left: "100%" },
+    "&light .cm-snippetField": { backgroundColor: "#00000022" },
+    "&dark .cm-snippetField": { backgroundColor: "#ffffff22" },
+    ".cm-snippetFieldPosition": {
+        verticalAlign: "text-top",
+        width: 0,
+        height: "1.15em",
+        margin: "0 -0.7px -.7em",
+        borderLeft: "1.4px dotted #888"
+    },
+    ".cm-completionMatchedText": {
+        textDecoration: "underline"
+    },
+    ".cm-completionDetail": {
+        marginLeft: "0.5em",
+        fontStyle: "italic"
+    },
+    ".cm-completionIcon": {
+        fontSize: "90%",
+        width: ".8em",
+        display: "inline-block",
+        textAlign: "center",
+        paddingRight: ".6em",
+        opacity: "0.6"
+    },
+    ".cm-completionIcon-function, .cm-completionIcon-method": {
+        "&:after": { content: "'ƒ'" }
+    },
+    ".cm-completionIcon-class": {
+        "&:after": { content: "'○'" }
+    },
+    ".cm-completionIcon-interface": {
+        "&:after": { content: "'◌'" }
+    },
+    ".cm-completionIcon-variable": {
+        "&:after": { content: "'𝑥'" }
+    },
+    ".cm-completionIcon-constant": {
+        "&:after": { content: "'𝐶'" }
+    },
+    ".cm-completionIcon-type": {
+        "&:after": { content: "'𝑡'" }
+    },
+    ".cm-completionIcon-enum": {
+        "&:after": { content: "'∪'" }
+    },
+    ".cm-completionIcon-property": {
+        "&:after": { content: "'□'" }
+    },
+    ".cm-completionIcon-keyword": {
+        "&:after": { content: "'🔑\uFE0E'" } // Disable emoji rendering
+    },
+    ".cm-completionIcon-namespace": {
+        "&:after": { content: "'▢'" }
+    },
+    ".cm-completionIcon-text": {
+        "&:after": { content: "'abc'", fontSize: "50%", verticalAlign: "middle" }
+    }
+});
+
+class FieldPos {
+    constructor(field, line, from, to) {
+        this.field = field;
+        this.line = line;
+        this.from = from;
+        this.to = to;
+    }
+}
+class FieldRange {
+    constructor(field, from, to) {
+        this.field = field;
+        this.from = from;
+        this.to = to;
+    }
+    map(changes) {
+        let from = changes.mapPos(this.from, -1, MapMode.TrackDel);
+        let to = changes.mapPos(this.to, 1, MapMode.TrackDel);
+        return from == null || to == null ? null : new FieldRange(this.field, from, to);
+    }
+}
+class Snippet {
+    constructor(lines, fieldPositions) {
+        this.lines = lines;
+        this.fieldPositions = fieldPositions;
+    }
+    instantiate(state, pos) {
+        let text = [], lineStart = [pos];
+        let lineObj = state.doc.lineAt(pos), baseIndent = /^\s*/.exec(lineObj.text)[0];
+        for (let line of this.lines) {
+            if (text.length) {
+                let indent = baseIndent, tabs = /^\t*/.exec(line)[0].length;
+                for (let i = 0; i < tabs; i++)
+                    indent += state.facet(indentUnit);
+                lineStart.push(pos + indent.length - tabs);
+                line = indent + line.slice(tabs);
+            }
+            text.push(line);
+            pos += line.length + 1;
+        }
+        let ranges = this.fieldPositions.map(pos => new FieldRange(pos.field, lineStart[pos.line] + pos.from, lineStart[pos.line] + pos.to));
+        return { text, ranges };
+    }
+    static parse(template) {
+        let fields = [];
+        let lines = [], positions = [], m;
+        for (let line of template.split(/\r\n?|\n/)) {
+            while (m = /[#$]\{(?:(\d+)(?::([^}]*))?|([^}]*))\}/.exec(line)) {
+                let seq = m[1] ? +m[1] : null, name = m[2] || m[3] || "", found = -1;
+                for (let i = 0; i < fields.length; i++) {
+                    if (seq != null ? fields[i].seq == seq : name ? fields[i].name == name : false)
+                        found = i;
+                }
+                if (found < 0) {
+                    let i = 0;
+                    while (i < fields.length && (seq == null || (fields[i].seq != null && fields[i].seq < seq)))
+                        i++;
+                    fields.splice(i, 0, { seq, name });
+                    found = i;
+                    for (let pos of positions)
+                        if (pos.field >= found)
+                            pos.field++;
+                }
+                positions.push(new FieldPos(found, lines.length, m.index, m.index + name.length));
+                line = line.slice(0, m.index) + name + line.slice(m.index + m[0].length);
+            }
+            for (let esc; esc = /([$#])\\{/.exec(line);) {
+                line = line.slice(0, esc.index) + esc[1] + "{" + line.slice(esc.index + esc[0].length);
+                for (let pos of positions)
+                    if (pos.line == lines.length && pos.from > esc.index) {
+                        pos.from--;
+                        pos.to--;
+                    }
+            }
+            lines.push(line);
+        }
+        return new Snippet(lines, positions);
+    }
+}
+let fieldMarker = /*@__PURE__*/Decoration.widget({ widget: /*@__PURE__*/new class extends WidgetType {
+        toDOM() {
+            let span = document.createElement("span");
+            span.className = "cm-snippetFieldPosition";
+            return span;
+        }
+        ignoreEvent() { return false; }
+    } });
+let fieldRange = /*@__PURE__*/Decoration.mark({ class: "cm-snippetField" });
+class ActiveSnippet {
+    constructor(ranges, active) {
+        this.ranges = ranges;
+        this.active = active;
+        this.deco = Decoration.set(ranges.map(r => (r.from == r.to ? fieldMarker : fieldRange).range(r.from, r.to)));
+    }
+    map(changes) {
+        let ranges = [];
+        for (let r of this.ranges) {
+            let mapped = r.map(changes);
+            if (!mapped)
+                return null;
+            ranges.push(mapped);
+        }
+        return new ActiveSnippet(ranges, this.active);
+    }
+    selectionInsideField(sel) {
+        return sel.ranges.every(range => this.ranges.some(r => r.field == this.active && r.from <= range.from && r.to >= range.to));
+    }
+}
+const setActive = /*@__PURE__*/StateEffect.define({
+    map(value, changes) { return value && value.map(changes); }
+});
+const moveToField = /*@__PURE__*/StateEffect.define();
+const snippetState = /*@__PURE__*/StateField.define({
+    create() { return null; },
+    update(value, tr) {
+        for (let effect of tr.effects) {
+            if (effect.is(setActive))
+                return effect.value;
+            if (effect.is(moveToField) && value)
+                return new ActiveSnippet(value.ranges, effect.value);
+        }
+        if (value && tr.docChanged)
+            value = value.map(tr.changes);
+        if (value && tr.selection && !value.selectionInsideField(tr.selection))
+            value = null;
+        return value;
+    },
+    provide: f => EditorView.decorations.from(f, val => val ? val.deco : Decoration.none)
+});
+function fieldSelection(ranges, field) {
+    return EditorSelection.create(ranges.filter(r => r.field == field).map(r => EditorSelection.range(r.from, r.to)));
+}
+/**
+Convert a snippet template to a function that can
+[apply](https://codemirror.net/6/docs/ref/#autocomplete.Completion.apply) it. Snippets are written
+using syntax like this:
+
+    "for (let ${index} = 0; ${index} < ${end}; ${index}++) {\n\t${}\n}"
+
+Each `${}` placeholder (you may also use `#{}`) indicates a field
+that the user can fill in. Its name, if any, will be the default
+content for the field.
+
+When the snippet is activated by calling the returned function,
+the code is inserted at the given position. Newlines in the
+template are indented by the indentation of the start line, plus
+one [indent unit](https://codemirror.net/6/docs/ref/#language.indentUnit) per tab character after
+the newline.
+
+On activation, (all instances of) the first field are selected.
+The user can move between fields with Tab and Shift-Tab as long as
+the fields are active. Moving to the last field or moving the
+cursor out of the current field deactivates the fields.
+
+The order of fields defaults to textual order, but you can add
+numbers to placeholders (`${1}` or `${1:defaultText}`) to provide
+a custom order.
+
+To include a literal `${` or `#{` in your template, put a
+backslash after the dollar or hash and before the brace (`$\\{`).
+This will be removed and the sequence will not be interpreted as a
+placeholder.
+*/
+function snippet(template) {
+    let snippet = Snippet.parse(template);
+    return (editor, _completion, from, to) => {
+        let { text, ranges } = snippet.instantiate(editor.state, from);
+        let spec = {
+            changes: { from, to, insert: Text.of(text) },
+            scrollIntoView: true
+        };
+        if (ranges.length)
+            spec.selection = fieldSelection(ranges, 0);
+        if (ranges.length > 1) {
+            let active = new ActiveSnippet(ranges, 0);
+            let effects = spec.effects = [setActive.of(active)];
+            if (editor.state.field(snippetState, false) === undefined)
+                effects.push(StateEffect.appendConfig.of([snippetState, addSnippetKeymap, snippetPointerHandler, baseTheme]));
+        }
+        editor.dispatch(editor.state.update(spec));
+    };
+}
+function moveField(dir) {
+    return ({ state, dispatch }) => {
+        let active = state.field(snippetState, false);
+        if (!active || dir < 0 && active.active == 0)
+            return false;
+        let next = active.active + dir, last = dir > 0 && !active.ranges.some(r => r.field == next + dir);
+        dispatch(state.update({
+            selection: fieldSelection(active.ranges, next),
+            effects: setActive.of(last ? null : new ActiveSnippet(active.ranges, next))
+        }));
+        return true;
+    };
+}
+/**
+A command that clears the active snippet, if any.
+*/
+const clearSnippet = ({ state, dispatch }) => {
+    let active = state.field(snippetState, false);
+    if (!active)
+        return false;
+    dispatch(state.update({ effects: setActive.of(null) }));
+    return true;
+};
+/**
+Move to the next snippet field, if available.
+*/
+const nextSnippetField = /*@__PURE__*/moveField(1);
+/**
+Move to the previous snippet field, if available.
+*/
+const prevSnippetField = /*@__PURE__*/moveField(-1);
+const defaultSnippetKeymap = [
+    { key: "Tab", run: nextSnippetField, shift: prevSnippetField },
+    { key: "Escape", run: clearSnippet }
+];
+/**
+A facet that can be used to configure the key bindings used by
+snippets. The default binds Tab to
+[`nextSnippetField`](https://codemirror.net/6/docs/ref/#autocomplete.nextSnippetField), Shift-Tab to
+[`prevSnippetField`](https://codemirror.net/6/docs/ref/#autocomplete.prevSnippetField), and Escape
+to [`clearSnippet`](https://codemirror.net/6/docs/ref/#autocomplete.clearSnippet).
+*/
+const snippetKeymap = /*@__PURE__*/Facet.define({
+    combine(maps) { return maps.length ? maps[0] : defaultSnippetKeymap; }
+});
+const addSnippetKeymap = /*@__PURE__*/Prec.highest(/*@__PURE__*/keymap.compute([snippetKeymap], state => state.facet(snippetKeymap)));
+/**
+Create a completion from a snippet. Returns an object with the
+properties from `completion`, plus an `apply` function that
+applies the snippet.
+*/
+function snippetCompletion(template, completion) {
+    return Object.assign(Object.assign({}, completion), { apply: snippet(template) });
+}
+const snippetPointerHandler = /*@__PURE__*/EditorView.domEventHandlers({
+    mousedown(event, view) {
+        let active = view.state.field(snippetState, false), pos;
+        if (!active || (pos = view.posAtCoords({ x: event.clientX, y: event.clientY })) == null)
+            return false;
+        let match = active.ranges.find(r => r.from <= pos && r.to >= pos);
+        if (!match || match.field == active.active)
+            return false;
+        view.dispatch({
+            selection: fieldSelection(active.ranges, match.field),
+            effects: setActive.of(active.ranges.some(r => r.field > match.field) ? new ActiveSnippet(active.ranges, match.field) : null)
+        });
+        return true;
+    }
+});
+
+const defaults = {
+    brackets: ["(", "[", "{", "'", '"'],
+    before: ")]}:;>"
+};
+const closeBracketEffect = /*@__PURE__*/StateEffect.define({
+    map(value, mapping) {
+        let mapped = mapping.mapPos(value, -1, MapMode.TrackAfter);
+        return mapped == null ? undefined : mapped;
+    }
+});
+const skipBracketEffect = /*@__PURE__*/StateEffect.define({
+    map(value, mapping) { return mapping.mapPos(value); }
+});
+const closedBracket = /*@__PURE__*/new class extends RangeValue {
+};
+closedBracket.startSide = 1;
+closedBracket.endSide = -1;
+const bracketState = /*@__PURE__*/StateField.define({
+    create() { return RangeSet.empty; },
+    update(value, tr) {
+        if (tr.selection) {
+            let lineStart = tr.state.doc.lineAt(tr.selection.main.head).from;
+            let prevLineStart = tr.startState.doc.lineAt(tr.startState.selection.main.head).from;
+            if (lineStart != tr.changes.mapPos(prevLineStart, -1))
+                value = RangeSet.empty;
+        }
+        value = value.map(tr.changes);
+        for (let effect of tr.effects) {
+            if (effect.is(closeBracketEffect))
+                value = value.update({ add: [closedBracket.range(effect.value, effect.value + 1)] });
+            else if (effect.is(skipBracketEffect))
+                value = value.update({ filter: from => from != effect.value });
+        }
+        return value;
+    }
+});
+/**
+Extension to enable bracket-closing behavior. When a closeable
+bracket is typed, its closing bracket is immediately inserted
+after the cursor. When closing a bracket directly in front of a
+closing bracket inserted by the extension, the cursor moves over
+that bracket.
+*/
+function closeBrackets() {
+    return [inputHandler, bracketState];
+}
+const definedClosing = "()[]{}<>";
+function closing(ch) {
+    for (let i = 0; i < definedClosing.length; i += 2)
+        if (definedClosing.charCodeAt(i) == ch)
+            return definedClosing.charAt(i + 1);
+    return fromCodePoint(ch < 128 ? ch : ch + 1);
+}
+function config(state, pos) {
+    return state.languageDataAt("closeBrackets", pos)[0] || defaults;
+}
+const android$1 = typeof navigator == "object" && /*@__PURE__*//Android\b/.test(navigator.userAgent);
+const inputHandler = /*@__PURE__*/EditorView.inputHandler.of((view, from, to, insert) => {
+    if ((android$1 ? view.composing : view.compositionStarted) || view.state.readOnly)
+        return false;
+    let sel = view.state.selection.main;
+    if (insert.length > 2 || insert.length == 2 && codePointSize(codePointAt(insert, 0)) == 1 ||
+        from != sel.from || to != sel.to)
+        return false;
+    let tr = insertBracket(view.state, insert);
+    if (!tr)
+        return false;
+    view.dispatch(tr);
+    return true;
+});
+/**
+Command that implements deleting a pair of matching brackets when
+the cursor is between them.
+*/
+const deleteBracketPair = ({ state, dispatch }) => {
+    if (state.readOnly)
+        return false;
+    let conf = config(state, state.selection.main.head);
+    let tokens = conf.brackets || defaults.brackets;
+    let dont = null, changes = state.changeByRange(range => {
+        if (range.empty) {
+            let before = prevChar(state.doc, range.head);
+            for (let token of tokens) {
+                if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0)))
+                    return { changes: { from: range.head - token.length, to: range.head + token.length },
+                        range: EditorSelection.cursor(range.head - token.length),
+                        userEvent: "delete.backward" };
+            }
+        }
+        return { range: dont = range };
+    });
+    if (!dont)
+        dispatch(state.update(changes, { scrollIntoView: true }));
+    return !dont;
+};
+/**
+Close-brackets related key bindings. Binds Backspace to
+[`deleteBracketPair`](https://codemirror.net/6/docs/ref/#autocomplete.deleteBracketPair).
+*/
+const closeBracketsKeymap = [
+    { key: "Backspace", run: deleteBracketPair }
+];
+/**
+Implements the extension's behavior on text insertion. If the
+given string counts as a bracket in the language around the
+selection, and replacing the selection with it requires custom
+behavior (inserting a closing version or skipping past a
+previously-closed bracket), this function returns a transaction
+representing that custom behavior. (You only need this if you want
+to programmatically insert brackets—the
+[`closeBrackets`](https://codemirror.net/6/docs/ref/#autocomplete.closeBrackets) extension will
+take care of running this for user input.)
+*/
+function insertBracket(state, bracket) {
+    let conf = config(state, state.selection.main.head);
+    let tokens = conf.brackets || defaults.brackets;
+    for (let tok of tokens) {
+        let closed = closing(codePointAt(tok, 0));
+        if (bracket == tok)
+            return closed == tok ? handleSame(state, tok, tokens.indexOf(tok + tok + tok) > -1)
+                : handleOpen(state, tok, closed, conf.before || defaults.before);
+        if (bracket == closed && closedBracketAt(state, state.selection.main.from))
+            return handleClose(state, tok, closed);
+    }
+    return null;
+}
+function closedBracketAt(state, pos) {
+    let found = false;
+    state.field(bracketState).between(0, state.doc.length, from => {
+        if (from == pos)
+            found = true;
+    });
+    return found;
+}
+function nextChar(doc, pos) {
+    let next = doc.sliceString(pos, pos + 2);
+    return next.slice(0, codePointSize(codePointAt(next, 0)));
+}
+function prevChar(doc, pos) {
+    let prev = doc.sliceString(pos - 2, pos);
+    return codePointSize(codePointAt(prev, 0)) == prev.length ? prev : prev.slice(1);
+}
+function handleOpen(state, open, close, closeBefore) {
+    let dont = null, changes = state.changeByRange(range => {
+        if (!range.empty)
+            return { changes: [{ insert: open, from: range.from }, { insert: close, from: range.to }],
+                effects: closeBracketEffect.of(range.to + open.length),
+                range: EditorSelection.range(range.anchor + open.length, range.head + open.length) };
+        let next = nextChar(state.doc, range.head);
+        if (!next || /\s/.test(next) || closeBefore.indexOf(next) > -1)
+            return { changes: { insert: open + close, from: range.head },
+                effects: closeBracketEffect.of(range.head + open.length),
+                range: EditorSelection.cursor(range.head + open.length) };
+        return { range: dont = range };
+    });
+    return dont ? null : state.update(changes, {
+        scrollIntoView: true,
+        userEvent: "input.type"
+    });
+}
+function handleClose(state, _open, close) {
+    let dont = null, moved = state.selection.ranges.map(range => {
+        if (range.empty && nextChar(state.doc, range.head) == close)
+            return EditorSelection.cursor(range.head + close.length);
+        return dont = range;
+    });
+    return dont ? null : state.update({
+        selection: EditorSelection.create(moved, state.selection.mainIndex),
+        scrollIntoView: true,
+        effects: state.selection.ranges.map(({ from }) => skipBracketEffect.of(from))
+    });
+}
+// Handles cases where the open and close token are the same, and
+// possibly triple quotes (as in `"""abc"""`-style quoting).
+function handleSame(state, token, allowTriple) {
+    let dont = null, changes = state.changeByRange(range => {
+        if (!range.empty)
+            return { changes: [{ insert: token, from: range.from }, { insert: token, from: range.to }],
+                effects: closeBracketEffect.of(range.to + token.length),
+                range: EditorSelection.range(range.anchor + token.length, range.head + token.length) };
+        let pos = range.head, next = nextChar(state.doc, pos);
+        if (next == token) {
+            if (nodeStart(state, pos)) {
+                return { changes: { insert: token + token, from: pos },
+                    effects: closeBracketEffect.of(pos + token.length),
+                    range: EditorSelection.cursor(pos + token.length) };
+            }
+            else if (closedBracketAt(state, pos)) {
+                let isTriple = allowTriple && state.sliceDoc(pos, pos + token.length * 3) == token + token + token;
+                return { range: EditorSelection.cursor(pos + token.length * (isTriple ? 3 : 1)),
+                    effects: skipBracketEffect.of(pos) };
+            }
+        }
+        else if (allowTriple && state.sliceDoc(pos - 2 * token.length, pos) == token + token &&
+            nodeStart(state, pos - 2 * token.length)) {
+            return { changes: { insert: token + token + token + token, from: pos },
+                effects: closeBracketEffect.of(pos + token.length),
+                range: EditorSelection.cursor(pos + token.length) };
+        }
+        else if (state.charCategorizer(pos)(next) != CharCategory.Word) {
+            let prev = state.sliceDoc(pos - 1, pos);
+            if (prev != token && state.charCategorizer(pos)(prev) != CharCategory.Word && !probablyInString(state, pos, token))
+                return { changes: { insert: token + token, from: pos },
+                    effects: closeBracketEffect.of(pos + token.length),
+                    range: EditorSelection.cursor(pos + token.length) };
+        }
+        return { range: dont = range };
+    });
+    return dont ? null : state.update(changes, {
+        scrollIntoView: true,
+        userEvent: "input.type"
+    });
+}
+function nodeStart(state, pos) {
+    let tree = syntaxTree(state).resolveInner(pos + 1);
+    return tree.parent && tree.from == pos;
+}
+function probablyInString(state, pos, quoteToken) {
+    let node = syntaxTree(state).resolveInner(pos, -1);
+    for (let i = 0; i < 5; i++) {
+        if (state.sliceDoc(node.from, node.from + quoteToken.length) == quoteToken) {
+            let first = node.firstChild;
+            while (first && first.from == node.from && first.to - first.from > quoteToken.length) {
+                if (state.sliceDoc(first.to - quoteToken.length, first.to) == quoteToken)
+                    return false;
+                first = first.firstChild;
+            }
+            return true;
+        }
+        let parent = node.to == pos && node.parent;
+        if (!parent)
+            break;
+        node = parent;
+    }
+    return false;
+}
+
+/**
+Returns an extension that enables autocompletion.
+*/
+function autocompletion(config = {}) {
+    return [
+        completionState,
+        completionConfig.of(config),
+        completionPlugin,
+        completionKeymapExt,
+        baseTheme
+    ];
+}
+/**
+Basic keybindings for autocompletion.
+
+ - Ctrl-Space: [`startCompletion`](https://codemirror.net/6/docs/ref/#autocomplete.startCompletion)
+ - Escape: [`closeCompletion`](https://codemirror.net/6/docs/ref/#autocomplete.closeCompletion)
+ - ArrowDown: [`moveCompletionSelection`](https://codemirror.net/6/docs/ref/#autocomplete.moveCompletionSelection)`(true)`
+ - ArrowUp: [`moveCompletionSelection`](https://codemirror.net/6/docs/ref/#autocomplete.moveCompletionSelection)`(false)`
+ - PageDown: [`moveCompletionSelection`](https://codemirror.net/6/docs/ref/#autocomplete.moveCompletionSelection)`(true, "page")`
+ - PageDown: [`moveCompletionSelection`](https://codemirror.net/6/docs/ref/#autocomplete.moveCompletionSelection)`(true, "page")`
+ - Enter: [`acceptCompletion`](https://codemirror.net/6/docs/ref/#autocomplete.acceptCompletion)
+*/
+const completionKeymap = [
+    { key: "Ctrl-Space", run: startCompletion },
+    { key: "Escape", run: closeCompletion },
+    { key: "ArrowDown", run: /*@__PURE__*/moveCompletionSelection(true) },
+    { key: "ArrowUp", run: /*@__PURE__*/moveCompletionSelection(false) },
+    { key: "PageDown", run: /*@__PURE__*/moveCompletionSelection(true, "page") },
+    { key: "PageUp", run: /*@__PURE__*/moveCompletionSelection(false, "page") },
+    { key: "Enter", run: acceptCompletion }
+];
+const completionKeymapExt = /*@__PURE__*/Prec.highest(/*@__PURE__*/keymap.computeN([completionConfig], state => state.facet(completionConfig).defaultKeymap ? [completionKeymap] : []));
+
+/**
+A minimal set of extensions to create a functional editor. Only
+includes [the default keymap](https://codemirror.net/6/docs/ref/#commands.defaultKeymap), [undo
+history](https://codemirror.net/6/docs/ref/#commands.history), [special character
+highlighting](https://codemirror.net/6/docs/ref/#view.highlightSpecialChars), [custom selection
+drawing](https://codemirror.net/6/docs/ref/#view.drawSelection), and [default highlight
+style](https://codemirror.net/6/docs/ref/#language.defaultHighlightStyle).
+*/
+const minimalSetup = /*@__PURE__*/(() => [
+    highlightSpecialChars(),
+    history(),
+    drawSelection(),
+    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    keymap.of([
+        ...defaultKeymap,
+        ...historyKeymap,
+    ])
+])();
+
+/// A parse stack. These are used internally by the parser to track
+/// parsing progress. They also provide some properties and methods
+/// that external code such as a tokenizer can use to get information
+/// about the parse state.
+class Stack {
+    /// @internal
+    constructor(
+    /// The parse that this stack is part of @internal
+    p, 
+    /// Holds state, input pos, buffer index triplets for all but the
+    /// top state @internal
+    stack, 
+    /// The current parse state @internal
+    state, 
+    // The position at which the next reduce should take place. This
+    // can be less than `this.pos` when skipped expressions have been
+    // added to the stack (which should be moved outside of the next
+    // reduction)
+    /// @internal
+    reducePos, 
+    /// The input position up to which this stack has parsed.
+    pos, 
+    /// The dynamic score of the stack, including dynamic precedence
+    /// and error-recovery penalties
+    /// @internal
+    score, 
+    // The output buffer. Holds (type, start, end, size) quads
+    // representing nodes created by the parser, where `size` is
+    // amount of buffer array entries covered by this node.
+    /// @internal
+    buffer, 
+    // The base offset of the buffer. When stacks are split, the split
+    // instance shared the buffer history with its parent up to
+    // `bufferBase`, which is the absolute offset (including the
+    // offset of previous splits) into the buffer at which this stack
+    // starts writing.
+    /// @internal
+    bufferBase, 
+    /// @internal
+    curContext, 
+    /// @internal
+    lookAhead = 0, 
+    // A parent stack from which this was split off, if any. This is
+    // set up so that it always points to a stack that has some
+    // additional buffer content, never to a stack with an equal
+    // `bufferBase`.
+    /// @internal
+    parent) {
+        this.p = p;
+        this.stack = stack;
+        this.state = state;
+        this.reducePos = reducePos;
+        this.pos = pos;
+        this.score = score;
+        this.buffer = buffer;
+        this.bufferBase = bufferBase;
+        this.curContext = curContext;
+        this.lookAhead = lookAhead;
+        this.parent = parent;
+    }
+    /// @internal
+    toString() {
+        return `[${this.stack.filter((_, i) => i % 3 == 0).concat(this.state)}]@${this.pos}${this.score ? "!" + this.score : ""}`;
+    }
+    // Start an empty stack
+    /// @internal
+    static start(p, state, pos = 0) {
+        let cx = p.parser.context;
+        return new Stack(p, [], state, pos, pos, 0, [], 0, cx ? new StackContext(cx, cx.start) : null, 0, null);
+    }
+    /// The stack's current [context](#lr.ContextTracker) value, if
+    /// any. Its type will depend on the context tracker's type
+    /// parameter, or it will be `null` if there is no context
+    /// tracker.
+    get context() { return this.curContext ? this.curContext.context : null; }
+    // Push a state onto the stack, tracking its start position as well
+    // as the buffer base at that point.
+    /// @internal
+    pushState(state, start) {
+        this.stack.push(this.state, start, this.bufferBase + this.buffer.length);
+        this.state = state;
+    }
+    // Apply a reduce action
+    /// @internal
+    reduce(action) {
+        let depth = action >> 19 /* ReduceDepthShift */, type = action & 65535 /* ValueMask */;
+        let { parser } = this.p;
+        let dPrec = parser.dynamicPrecedence(type);
+        if (dPrec)
+            this.score += dPrec;
+        if (depth == 0) {
+            this.pushState(parser.getGoto(this.state, type, true), this.reducePos);
+            // Zero-depth reductions are a special case—they add stuff to
+            // the stack without popping anything off.
+            if (type < parser.minRepeatTerm)
+                this.storeNode(type, this.reducePos, this.reducePos, 4, true);
+            this.reduceContext(type, this.reducePos);
+            return;
+        }
+        // Find the base index into `this.stack`, content after which will
+        // be dropped. Note that with `StayFlag` reductions we need to
+        // consume two extra frames (the dummy parent node for the skipped
+        // expression and the state that we'll be staying in, which should
+        // be moved to `this.state`).
+        let base = this.stack.length - ((depth - 1) * 3) - (action & 262144 /* StayFlag */ ? 6 : 0);
+        let start = this.stack[base - 2];
+        let bufferBase = this.stack[base - 1], count = this.bufferBase + this.buffer.length - bufferBase;
+        // Store normal terms or `R -> R R` repeat reductions
+        if (type < parser.minRepeatTerm || (action & 131072 /* RepeatFlag */)) {
+            let pos = parser.stateFlag(this.state, 1 /* Skipped */) ? this.pos : this.reducePos;
+            this.storeNode(type, start, pos, count + 4, true);
+        }
+        if (action & 262144 /* StayFlag */) {
+            this.state = this.stack[base];
+        }
+        else {
+            let baseStateID = this.stack[base - 3];
+            this.state = parser.getGoto(baseStateID, type, true);
+        }
+        while (this.stack.length > base)
+            this.stack.pop();
+        this.reduceContext(type, start);
+    }
+    // Shift a value into the buffer
+    /// @internal
+    storeNode(term, start, end, size = 4, isReduce = false) {
+        if (term == 0 /* Err */ &&
+            (!this.stack.length || this.stack[this.stack.length - 1] < this.buffer.length + this.bufferBase)) {
+            // Try to omit/merge adjacent error nodes
+            let cur = this, top = this.buffer.length;
+            if (top == 0 && cur.parent) {
+                top = cur.bufferBase - cur.parent.bufferBase;
+                cur = cur.parent;
+            }
+            if (top > 0 && cur.buffer[top - 4] == 0 /* Err */ && cur.buffer[top - 1] > -1) {
+                if (start == end)
+                    return;
+                if (cur.buffer[top - 2] >= start) {
+                    cur.buffer[top - 2] = end;
+                    return;
+                }
+            }
+        }
+        if (!isReduce || this.pos == end) { // Simple case, just append
+            this.buffer.push(term, start, end, size);
+        }
+        else { // There may be skipped nodes that have to be moved forward
+            let index = this.buffer.length;
+            if (index > 0 && this.buffer[index - 4] != 0 /* Err */)
+                while (index > 0 && this.buffer[index - 2] > end) {
+                    // Move this record forward
+                    this.buffer[index] = this.buffer[index - 4];
+                    this.buffer[index + 1] = this.buffer[index - 3];
+                    this.buffer[index + 2] = this.buffer[index - 2];
+                    this.buffer[index + 3] = this.buffer[index - 1];
+                    index -= 4;
+                    if (size > 4)
+                        size -= 4;
+                }
+            this.buffer[index] = term;
+            this.buffer[index + 1] = start;
+            this.buffer[index + 2] = end;
+            this.buffer[index + 3] = size;
+        }
+    }
+    // Apply a shift action
+    /// @internal
+    shift(action, next, nextEnd) {
+        let start = this.pos;
+        if (action & 131072 /* GotoFlag */) {
+            this.pushState(action & 65535 /* ValueMask */, this.pos);
+        }
+        else if ((action & 262144 /* StayFlag */) == 0) { // Regular shift
+            let nextState = action, { parser } = this.p;
+            if (nextEnd > this.pos || next <= parser.maxNode) {
+                this.pos = nextEnd;
+                if (!parser.stateFlag(nextState, 1 /* Skipped */))
+                    this.reducePos = nextEnd;
+            }
+            this.pushState(nextState, start);
+            this.shiftContext(next, start);
+            if (next <= parser.maxNode)
+                this.buffer.push(next, start, nextEnd, 4);
+        }
+        else { // Shift-and-stay, which means this is a skipped token
+            this.pos = nextEnd;
+            this.shiftContext(next, start);
+            if (next <= this.p.parser.maxNode)
+                this.buffer.push(next, start, nextEnd, 4);
+        }
+    }
+    // Apply an action
+    /// @internal
+    apply(action, next, nextEnd) {
+        if (action & 65536 /* ReduceFlag */)
+            this.reduce(action);
+        else
+            this.shift(action, next, nextEnd);
+    }
+    // Add a prebuilt (reused) node into the buffer.
+    /// @internal
+    useNode(value, next) {
+        let index = this.p.reused.length - 1;
+        if (index < 0 || this.p.reused[index] != value) {
+            this.p.reused.push(value);
+            index++;
+        }
+        let start = this.pos;
+        this.reducePos = this.pos = start + value.length;
+        this.pushState(next, start);
+        this.buffer.push(index, start, this.reducePos, -1 /* size == -1 means this is a reused value */);
+        if (this.curContext)
+            this.updateContext(this.curContext.tracker.reuse(this.curContext.context, value, this, this.p.stream.reset(this.pos - value.length)));
+    }
+    // Split the stack. Due to the buffer sharing and the fact
+    // that `this.stack` tends to stay quite shallow, this isn't very
+    // expensive.
+    /// @internal
+    split() {
+        let parent = this;
+        let off = parent.buffer.length;
+        // Because the top of the buffer (after this.pos) may be mutated
+        // to reorder reductions and skipped tokens, and shared buffers
+        // should be immutable, this copies any outstanding skipped tokens
+        // to the new buffer, and puts the base pointer before them.
+        while (off > 0 && parent.buffer[off - 2] > parent.reducePos)
+            off -= 4;
+        let buffer = parent.buffer.slice(off), base = parent.bufferBase + off;
+        // Make sure parent points to an actual parent with content, if there is such a parent.
+        while (parent && base == parent.bufferBase)
+            parent = parent.parent;
+        return new Stack(this.p, this.stack.slice(), this.state, this.reducePos, this.pos, this.score, buffer, base, this.curContext, this.lookAhead, parent);
+    }
+    // Try to recover from an error by 'deleting' (ignoring) one token.
+    /// @internal
+    recoverByDelete(next, nextEnd) {
+        let isNode = next <= this.p.parser.maxNode;
+        if (isNode)
+            this.storeNode(next, this.pos, nextEnd, 4);
+        this.storeNode(0 /* Err */, this.pos, nextEnd, isNode ? 8 : 4);
+        this.pos = this.reducePos = nextEnd;
+        this.score -= 190 /* Delete */;
+    }
+    /// Check if the given term would be able to be shifted (optionally
+    /// after some reductions) on this stack. This can be useful for
+    /// external tokenizers that want to make sure they only provide a
+    /// given token when it applies.
+    canShift(term) {
+        for (let sim = new SimulatedStack(this);;) {
+            let action = this.p.parser.stateSlot(sim.state, 4 /* DefaultReduce */) || this.p.parser.hasAction(sim.state, term);
+            if ((action & 65536 /* ReduceFlag */) == 0)
+                return true;
+            if (action == 0)
+                return false;
+            sim.reduce(action);
+        }
+    }
+    // Apply up to Recover.MaxNext recovery actions that conceptually
+    // inserts some missing token or rule.
+    /// @internal
+    recoverByInsert(next) {
+        if (this.stack.length >= 300 /* MaxInsertStackDepth */)
+            return [];
+        let nextStates = this.p.parser.nextStates(this.state);
+        if (nextStates.length > 4 /* MaxNext */ << 1 || this.stack.length >= 120 /* DampenInsertStackDepth */) {
+            let best = [];
+            for (let i = 0, s; i < nextStates.length; i += 2) {
+                if ((s = nextStates[i + 1]) != this.state && this.p.parser.hasAction(s, next))
+                    best.push(nextStates[i], s);
+            }
+            if (this.stack.length < 120 /* DampenInsertStackDepth */)
+                for (let i = 0; best.length < 4 /* MaxNext */ << 1 && i < nextStates.length; i += 2) {
+                    let s = nextStates[i + 1];
+                    if (!best.some((v, i) => (i & 1) && v == s))
+                        best.push(nextStates[i], s);
+                }
+            nextStates = best;
+        }
+        let result = [];
+        for (let i = 0; i < nextStates.length && result.length < 4 /* MaxNext */; i += 2) {
+            let s = nextStates[i + 1];
+            if (s == this.state)
+                continue;
+            let stack = this.split();
+            stack.pushState(s, this.pos);
+            stack.storeNode(0 /* Err */, stack.pos, stack.pos, 4, true);
+            stack.shiftContext(nextStates[i], this.pos);
+            stack.score -= 200 /* Insert */;
+            result.push(stack);
+        }
+        return result;
+    }
+    // Force a reduce, if possible. Return false if that can't
+    // be done.
+    /// @internal
+    forceReduce() {
+        let reduce = this.p.parser.stateSlot(this.state, 5 /* ForcedReduce */);
+        if ((reduce & 65536 /* ReduceFlag */) == 0)
+            return false;
+        let { parser } = this.p;
+        if (!parser.validAction(this.state, reduce)) {
+            let depth = reduce >> 19 /* ReduceDepthShift */, term = reduce & 65535 /* ValueMask */;
+            let target = this.stack.length - depth * 3;
+            if (target < 0 || parser.getGoto(this.stack[target], term, false) < 0)
+                return false;
+            this.storeNode(0 /* Err */, this.reducePos, this.reducePos, 4, true);
+            this.score -= 100 /* Reduce */;
+        }
+        this.reducePos = this.pos;
+        this.reduce(reduce);
+        return true;
+    }
+    /// @internal
+    forceAll() {
+        while (!this.p.parser.stateFlag(this.state, 2 /* Accepting */)) {
+            if (!this.forceReduce()) {
+                this.storeNode(0 /* Err */, this.pos, this.pos, 4, true);
+                break;
+            }
+        }
+        return this;
+    }
+    /// Check whether this state has no further actions (assumed to be a direct descendant of the
+    /// top state, since any other states must be able to continue
+    /// somehow). @internal
+    get deadEnd() {
+        if (this.stack.length != 3)
+            return false;
+        let { parser } = this.p;
+        return parser.data[parser.stateSlot(this.state, 1 /* Actions */)] == 65535 /* End */ &&
+            !parser.stateSlot(this.state, 4 /* DefaultReduce */);
+    }
+    /// Restart the stack (put it back in its start state). Only safe
+    /// when this.stack.length == 3 (state is directly below the top
+    /// state). @internal
+    restart() {
+        this.state = this.stack[0];
+        this.stack.length = 0;
+    }
+    /// @internal
+    sameState(other) {
+        if (this.state != other.state || this.stack.length != other.stack.length)
+            return false;
+        for (let i = 0; i < this.stack.length; i += 3)
+            if (this.stack[i] != other.stack[i])
+                return false;
+        return true;
+    }
+    /// Get the parser used by this stack.
+    get parser() { return this.p.parser; }
+    /// Test whether a given dialect (by numeric ID, as exported from
+    /// the terms file) is enabled.
+    dialectEnabled(dialectID) { return this.p.parser.dialect.flags[dialectID]; }
+    shiftContext(term, start) {
+        if (this.curContext)
+            this.updateContext(this.curContext.tracker.shift(this.curContext.context, term, this, this.p.stream.reset(start)));
+    }
+    reduceContext(term, start) {
+        if (this.curContext)
+            this.updateContext(this.curContext.tracker.reduce(this.curContext.context, term, this, this.p.stream.reset(start)));
+    }
+    /// @internal
+    emitContext() {
+        let last = this.buffer.length - 1;
+        if (last < 0 || this.buffer[last] != -3)
+            this.buffer.push(this.curContext.hash, this.reducePos, this.reducePos, -3);
+    }
+    /// @internal
+    emitLookAhead() {
+        let last = this.buffer.length - 1;
+        if (last < 0 || this.buffer[last] != -4)
+            this.buffer.push(this.lookAhead, this.reducePos, this.reducePos, -4);
+    }
+    updateContext(context) {
+        if (context != this.curContext.context) {
+            let newCx = new StackContext(this.curContext.tracker, context);
+            if (newCx.hash != this.curContext.hash)
+                this.emitContext();
+            this.curContext = newCx;
+        }
+    }
+    /// @internal
+    setLookAhead(lookAhead) {
+        if (lookAhead > this.lookAhead) {
+            this.emitLookAhead();
+            this.lookAhead = lookAhead;
+        }
+    }
+    /// @internal
+    close() {
+        if (this.curContext && this.curContext.tracker.strict)
+            this.emitContext();
+        if (this.lookAhead > 0)
+            this.emitLookAhead();
+    }
+}
+class StackContext {
+    constructor(tracker, context) {
+        this.tracker = tracker;
+        this.context = context;
+        this.hash = tracker.strict ? tracker.hash(context) : 0;
+    }
+}
+var Recover;
+(function (Recover) {
+    Recover[Recover["Insert"] = 200] = "Insert";
+    Recover[Recover["Delete"] = 190] = "Delete";
+    Recover[Recover["Reduce"] = 100] = "Reduce";
+    Recover[Recover["MaxNext"] = 4] = "MaxNext";
+    Recover[Recover["MaxInsertStackDepth"] = 300] = "MaxInsertStackDepth";
+    Recover[Recover["DampenInsertStackDepth"] = 120] = "DampenInsertStackDepth";
+})(Recover || (Recover = {}));
+// Used to cheaply run some reductions to scan ahead without mutating
+// an entire stack
+class SimulatedStack {
+    constructor(start) {
+        this.start = start;
+        this.state = start.state;
+        this.stack = start.stack;
+        this.base = this.stack.length;
+    }
+    reduce(action) {
+        let term = action & 65535 /* ValueMask */, depth = action >> 19 /* ReduceDepthShift */;
+        if (depth == 0) {
+            if (this.stack == this.start.stack)
+                this.stack = this.stack.slice();
+            this.stack.push(this.state, 0, 0);
+            this.base += 3;
+        }
+        else {
+            this.base -= (depth - 1) * 3;
+        }
+        let goto = this.start.p.parser.getGoto(this.stack[this.base - 3], term, true);
+        this.state = goto;
+    }
+}
+// This is given to `Tree.build` to build a buffer, and encapsulates
+// the parent-stack-walking necessary to read the nodes.
+class StackBufferCursor {
+    constructor(stack, pos, index) {
+        this.stack = stack;
+        this.pos = pos;
+        this.index = index;
+        this.buffer = stack.buffer;
+        if (this.index == 0)
+            this.maybeNext();
+    }
+    static create(stack, pos = stack.bufferBase + stack.buffer.length) {
+        return new StackBufferCursor(stack, pos, pos - stack.bufferBase);
+    }
+    maybeNext() {
+        let next = this.stack.parent;
+        if (next != null) {
+            this.index = this.stack.bufferBase - next.bufferBase;
+            this.stack = next;
+            this.buffer = next.buffer;
+        }
+    }
+    get id() { return this.buffer[this.index - 4]; }
+    get start() { return this.buffer[this.index - 3]; }
+    get end() { return this.buffer[this.index - 2]; }
+    get size() { return this.buffer[this.index - 1]; }
+    next() {
+        this.index -= 4;
+        this.pos -= 4;
+        if (this.index == 0)
+            this.maybeNext();
+    }
+    fork() {
+        return new StackBufferCursor(this.stack, this.pos, this.index);
+    }
+}
+
+class CachedToken {
+    constructor() {
+        this.start = -1;
+        this.value = -1;
+        this.end = -1;
+        this.extended = -1;
+        this.lookAhead = 0;
+        this.mask = 0;
+        this.context = 0;
+    }
+}
+const nullToken = new CachedToken;
+/// [Tokenizers](#lr.ExternalTokenizer) interact with the input
+/// through this interface. It presents the input as a stream of
+/// characters, tracking lookahead and hiding the complexity of
+/// [ranges](#common.Parser.parse^ranges) from tokenizer code.
+class InputStream {
+    /// @internal
+    constructor(
+    /// @internal
+    input, 
+    /// @internal
+    ranges) {
+        this.input = input;
+        this.ranges = ranges;
+        /// @internal
+        this.chunk = "";
+        /// @internal
+        this.chunkOff = 0;
+        /// Backup chunk
+        this.chunk2 = "";
+        this.chunk2Pos = 0;
+        /// The character code of the next code unit in the input, or -1
+        /// when the stream is at the end of the input.
+        this.next = -1;
+        /// @internal
+        this.token = nullToken;
+        this.rangeIndex = 0;
+        this.pos = this.chunkPos = ranges[0].from;
+        this.range = ranges[0];
+        this.end = ranges[ranges.length - 1].to;
+        this.readNext();
+    }
+    /// @internal
+    resolveOffset(offset, assoc) {
+        let range = this.range, index = this.rangeIndex;
+        let pos = this.pos + offset;
+        while (pos < range.from) {
+            if (!index)
+                return null;
+            let next = this.ranges[--index];
+            pos -= range.from - next.to;
+            range = next;
+        }
+        while (assoc < 0 ? pos > range.to : pos >= range.to) {
+            if (index == this.ranges.length - 1)
+                return null;
+            let next = this.ranges[++index];
+            pos += next.from - range.to;
+            range = next;
+        }
+        return pos;
+    }
+    /// Look at a code unit near the stream position. `.peek(0)` equals
+    /// `.next`, `.peek(-1)` gives you the previous character, and so
+    /// on.
+    ///
+    /// Note that looking around during tokenizing creates dependencies
+    /// on potentially far-away content, which may reduce the
+    /// effectiveness incremental parsing—when looking forward—or even
+    /// cause invalid reparses when looking backward more than 25 code
+    /// units, since the library does not track lookbehind.
+    peek(offset) {
+        let idx = this.chunkOff + offset, pos, result;
+        if (idx >= 0 && idx < this.chunk.length) {
+            pos = this.pos + offset;
+            result = this.chunk.charCodeAt(idx);
+        }
+        else {
+            let resolved = this.resolveOffset(offset, 1);
+            if (resolved == null)
+                return -1;
+            pos = resolved;
+            if (pos >= this.chunk2Pos && pos < this.chunk2Pos + this.chunk2.length) {
+                result = this.chunk2.charCodeAt(pos - this.chunk2Pos);
+            }
+            else {
+                let i = this.rangeIndex, range = this.range;
+                while (range.to <= pos)
+                    range = this.ranges[++i];
+                this.chunk2 = this.input.chunk(this.chunk2Pos = pos);
+                if (pos + this.chunk2.length > range.to)
+                    this.chunk2 = this.chunk2.slice(0, range.to - pos);
+                result = this.chunk2.charCodeAt(0);
+            }
+        }
+        if (pos >= this.token.lookAhead)
+            this.token.lookAhead = pos + 1;
+        return result;
+    }
+    /// Accept a token. By default, the end of the token is set to the
+    /// current stream position, but you can pass an offset (relative to
+    /// the stream position) to change that.
+    acceptToken(token, endOffset = 0) {
+        let end = endOffset ? this.resolveOffset(endOffset, -1) : this.pos;
+        if (end == null || end < this.token.start)
+            throw new RangeError("Token end out of bounds");
+        this.token.value = token;
+        this.token.end = end;
+    }
+    getChunk() {
+        if (this.pos >= this.chunk2Pos && this.pos < this.chunk2Pos + this.chunk2.length) {
+            let { chunk, chunkPos } = this;
+            this.chunk = this.chunk2;
+            this.chunkPos = this.chunk2Pos;
+            this.chunk2 = chunk;
+            this.chunk2Pos = chunkPos;
+            this.chunkOff = this.pos - this.chunkPos;
+        }
+        else {
+            this.chunk2 = this.chunk;
+            this.chunk2Pos = this.chunkPos;
+            let nextChunk = this.input.chunk(this.pos);
+            let end = this.pos + nextChunk.length;
+            this.chunk = end > this.range.to ? nextChunk.slice(0, this.range.to - this.pos) : nextChunk;
+            this.chunkPos = this.pos;
+            this.chunkOff = 0;
+        }
+    }
+    readNext() {
+        if (this.chunkOff >= this.chunk.length) {
+            this.getChunk();
+            if (this.chunkOff == this.chunk.length)
+                return this.next = -1;
+        }
+        return this.next = this.chunk.charCodeAt(this.chunkOff);
+    }
+    /// Move the stream forward N (defaults to 1) code units. Returns
+    /// the new value of [`next`](#lr.InputStream.next).
+    advance(n = 1) {
+        this.chunkOff += n;
+        while (this.pos + n >= this.range.to) {
+            if (this.rangeIndex == this.ranges.length - 1)
+                return this.setDone();
+            n -= this.range.to - this.pos;
+            this.range = this.ranges[++this.rangeIndex];
+            this.pos = this.range.from;
+        }
+        this.pos += n;
+        if (this.pos >= this.token.lookAhead)
+            this.token.lookAhead = this.pos + 1;
+        return this.readNext();
+    }
+    setDone() {
+        this.pos = this.chunkPos = this.end;
+        this.range = this.ranges[this.rangeIndex = this.ranges.length - 1];
+        this.chunk = "";
+        return this.next = -1;
+    }
+    /// @internal
+    reset(pos, token) {
+        if (token) {
+            this.token = token;
+            token.start = pos;
+            token.lookAhead = pos + 1;
+            token.value = token.extended = -1;
+        }
+        else {
+            this.token = nullToken;
+        }
+        if (this.pos != pos) {
+            this.pos = pos;
+            if (pos == this.end) {
+                this.setDone();
+                return this;
+            }
+            while (pos < this.range.from)
+                this.range = this.ranges[--this.rangeIndex];
+            while (pos >= this.range.to)
+                this.range = this.ranges[++this.rangeIndex];
+            if (pos >= this.chunkPos && pos < this.chunkPos + this.chunk.length) {
+                this.chunkOff = pos - this.chunkPos;
+            }
+            else {
+                this.chunk = "";
+                this.chunkOff = 0;
+            }
+            this.readNext();
+        }
+        return this;
+    }
+    /// @internal
+    read(from, to) {
+        if (from >= this.chunkPos && to <= this.chunkPos + this.chunk.length)
+            return this.chunk.slice(from - this.chunkPos, to - this.chunkPos);
+        if (from >= this.chunk2Pos && to <= this.chunk2Pos + this.chunk2.length)
+            return this.chunk2.slice(from - this.chunk2Pos, to - this.chunk2Pos);
+        if (from >= this.range.from && to <= this.range.to)
+            return this.input.read(from, to);
+        let result = "";
+        for (let r of this.ranges) {
+            if (r.from >= to)
+                break;
+            if (r.to > from)
+                result += this.input.read(Math.max(r.from, from), Math.min(r.to, to));
+        }
+        return result;
+    }
+}
+/// @internal
+class TokenGroup {
+    constructor(data, id) {
+        this.data = data;
+        this.id = id;
+    }
+    token(input, stack) { readToken(this.data, input, stack, this.id); }
+}
+TokenGroup.prototype.contextual = TokenGroup.prototype.fallback = TokenGroup.prototype.extend = false;
+/// `@external tokens` declarations in the grammar should resolve to
+/// an instance of this class.
+class ExternalTokenizer {
+    /// Create a tokenizer. The first argument is the function that,
+    /// given an input stream, scans for the types of tokens it
+    /// recognizes at the stream's position, and calls
+    /// [`acceptToken`](#lr.InputStream.acceptToken) when it finds
+    /// one.
+    constructor(
+    /// @internal
+    token, options = {}) {
+        this.token = token;
+        this.contextual = !!options.contextual;
+        this.fallback = !!options.fallback;
+        this.extend = !!options.extend;
+    }
+}
+// Tokenizer data is stored a big uint16 array containing, for each
+// state:
+//
+//  - A group bitmask, indicating what token groups are reachable from
+//    this state, so that paths that can only lead to tokens not in
+//    any of the current groups can be cut off early.
+//
+//  - The position of the end of the state's sequence of accepting
+//    tokens
+//
+//  - The number of outgoing edges for the state
+//
+//  - The accepting tokens, as (token id, group mask) pairs
+//
+//  - The outgoing edges, as (start character, end character, state
+//    index) triples, with end character being exclusive
+//
+// This function interprets that data, running through a stream as
+// long as new states with the a matching group mask can be reached,
+// and updating `input.token` when it matches a token.
+function readToken(data, input, stack, group) {
+    let state = 0, groupMask = 1 << group, { parser } = stack.p, { dialect } = parser;
+    scan: for (;;) {
+        if ((groupMask & data[state]) == 0)
+            break;
+        let accEnd = data[state + 1];
+        // Check whether this state can lead to a token in the current group
+        // Accept tokens in this state, possibly overwriting
+        // lower-precedence / shorter tokens
+        for (let i = state + 3; i < accEnd; i += 2)
+            if ((data[i + 1] & groupMask) > 0) {
+                let term = data[i];
+                if (dialect.allows(term) &&
+                    (input.token.value == -1 || input.token.value == term || parser.overrides(term, input.token.value))) {
+                    input.acceptToken(term);
+                    break;
+                }
+            }
+        let next = input.next, low = 0, high = data[state + 2];
+        // Special case for EOF
+        if (input.next < 0 && high > low && data[accEnd + high * 3 - 3] == 65535 /* End */) {
+            state = data[accEnd + high * 3 - 1];
+            continue scan;
+        }
+        // Do a binary search on the state's edges
+        for (; low < high;) {
+            let mid = (low + high) >> 1;
+            let index = accEnd + mid + (mid << 1);
+            let from = data[index], to = data[index + 1];
+            if (next < from)
+                high = mid;
+            else if (next >= to)
+                low = mid + 1;
+            else {
+                state = data[index + 2];
+                input.advance();
+                continue scan;
+            }
+        }
+        break;
+    }
+}
+
+// See lezer-generator/src/encode.ts for comments about the encoding
+// used here
+function decodeArray(input, Type = Uint16Array) {
+    if (typeof input != "string")
+        return input;
+    let array = null;
+    for (let pos = 0, out = 0; pos < input.length;) {
+        let value = 0;
+        for (;;) {
+            let next = input.charCodeAt(pos++), stop = false;
+            if (next == 126 /* BigValCode */) {
+                value = 65535 /* BigVal */;
+                break;
+            }
+            if (next >= 92 /* Gap2 */)
+                next--;
+            if (next >= 34 /* Gap1 */)
+                next--;
+            let digit = next - 32 /* Start */;
+            if (digit >= 46 /* Base */) {
+                digit -= 46 /* Base */;
+                stop = true;
+            }
+            value += digit;
+            if (stop)
+                break;
+            value *= 46 /* Base */;
+        }
+        if (array)
+            array[out++] = value;
+        else
+            array = new Type(value);
+    }
+    return array;
+}
+
+// Environment variable used to control console output
+const verbose = typeof process != "undefined" && process.env && /\bparse\b/.test(process.env.LOG);
+let stackIDs = null;
+var Safety;
+(function (Safety) {
+    Safety[Safety["Margin"] = 25] = "Margin";
+})(Safety || (Safety = {}));
+function cutAt(tree, pos, side) {
+    let cursor = tree.cursor(IterMode.IncludeAnonymous);
+    cursor.moveTo(pos);
+    for (;;) {
+        if (!(side < 0 ? cursor.childBefore(pos) : cursor.childAfter(pos)))
+            for (;;) {
+                if ((side < 0 ? cursor.to < pos : cursor.from > pos) && !cursor.type.isError)
+                    return side < 0 ? Math.max(0, Math.min(cursor.to - 1, pos - 25 /* Margin */))
+                        : Math.min(tree.length, Math.max(cursor.from + 1, pos + 25 /* Margin */));
+                if (side < 0 ? cursor.prevSibling() : cursor.nextSibling())
+                    break;
+                if (!cursor.parent())
+                    return side < 0 ? 0 : tree.length;
+            }
+    }
+}
+class FragmentCursor {
+    constructor(fragments, nodeSet) {
+        this.fragments = fragments;
+        this.nodeSet = nodeSet;
+        this.i = 0;
+        this.fragment = null;
+        this.safeFrom = -1;
+        this.safeTo = -1;
+        this.trees = [];
+        this.start = [];
+        this.index = [];
+        this.nextFragment();
+    }
+    nextFragment() {
+        let fr = this.fragment = this.i == this.fragments.length ? null : this.fragments[this.i++];
+        if (fr) {
+            this.safeFrom = fr.openStart ? cutAt(fr.tree, fr.from + fr.offset, 1) - fr.offset : fr.from;
+            this.safeTo = fr.openEnd ? cutAt(fr.tree, fr.to + fr.offset, -1) - fr.offset : fr.to;
+            while (this.trees.length) {
+                this.trees.pop();
+                this.start.pop();
+                this.index.pop();
+            }
+            this.trees.push(fr.tree);
+            this.start.push(-fr.offset);
+            this.index.push(0);
+            this.nextStart = this.safeFrom;
+        }
+        else {
+            this.nextStart = 1e9;
+        }
+    }
+    // `pos` must be >= any previously given `pos` for this cursor
+    nodeAt(pos) {
+        if (pos < this.nextStart)
+            return null;
+        while (this.fragment && this.safeTo <= pos)
+            this.nextFragment();
+        if (!this.fragment)
+            return null;
+        for (;;) {
+            let last = this.trees.length - 1;
+            if (last < 0) { // End of tree
+                this.nextFragment();
+                return null;
+            }
+            let top = this.trees[last], index = this.index[last];
+            if (index == top.children.length) {
+                this.trees.pop();
+                this.start.pop();
+                this.index.pop();
+                continue;
+            }
+            let next = top.children[index];
+            let start = this.start[last] + top.positions[index];
+            if (start > pos) {
+                this.nextStart = start;
+                return null;
+            }
+            if (next instanceof Tree) {
+                if (start == pos) {
+                    if (start < this.safeFrom)
+                        return null;
+                    let end = start + next.length;
+                    if (end <= this.safeTo) {
+                        let lookAhead = next.prop(NodeProp.lookAhead);
+                        if (!lookAhead || end + lookAhead < this.fragment.to)
+                            return next;
+                    }
+                }
+                this.index[last]++;
+                if (start + next.length >= Math.max(this.safeFrom, pos)) { // Enter this node
+                    this.trees.push(next);
+                    this.start.push(start);
+                    this.index.push(0);
+                }
+            }
+            else {
+                this.index[last]++;
+                this.nextStart = start + next.length;
+            }
+        }
+    }
+}
+class TokenCache {
+    constructor(parser, stream) {
+        this.stream = stream;
+        this.tokens = [];
+        this.mainToken = null;
+        this.actions = [];
+        this.tokens = parser.tokenizers.map(_ => new CachedToken);
+    }
+    getActions(stack) {
+        let actionIndex = 0;
+        let main = null;
+        let { parser } = stack.p, { tokenizers } = parser;
+        let mask = parser.stateSlot(stack.state, 3 /* TokenizerMask */);
+        let context = stack.curContext ? stack.curContext.hash : 0;
+        let lookAhead = 0;
+        for (let i = 0; i < tokenizers.length; i++) {
+            if (((1 << i) & mask) == 0)
+                continue;
+            let tokenizer = tokenizers[i], token = this.tokens[i];
+            if (main && !tokenizer.fallback)
+                continue;
+            if (tokenizer.contextual || token.start != stack.pos || token.mask != mask || token.context != context) {
+                this.updateCachedToken(token, tokenizer, stack);
+                token.mask = mask;
+                token.context = context;
+            }
+            if (token.lookAhead > token.end + 25 /* Margin */)
+                lookAhead = Math.max(token.lookAhead, lookAhead);
+            if (token.value != 0 /* Err */) {
+                let startIndex = actionIndex;
+                if (token.extended > -1)
+                    actionIndex = this.addActions(stack, token.extended, token.end, actionIndex);
+                actionIndex = this.addActions(stack, token.value, token.end, actionIndex);
+                if (!tokenizer.extend) {
+                    main = token;
+                    if (actionIndex > startIndex)
+                        break;
+                }
+            }
+        }
+        while (this.actions.length > actionIndex)
+            this.actions.pop();
+        if (lookAhead)
+            stack.setLookAhead(lookAhead);
+        if (!main && stack.pos == this.stream.end) {
+            main = new CachedToken;
+            main.value = stack.p.parser.eofTerm;
+            main.start = main.end = stack.pos;
+            actionIndex = this.addActions(stack, main.value, main.end, actionIndex);
+        }
+        this.mainToken = main;
+        return this.actions;
+    }
+    getMainToken(stack) {
+        if (this.mainToken)
+            return this.mainToken;
+        let main = new CachedToken, { pos, p } = stack;
+        main.start = pos;
+        main.end = Math.min(pos + 1, p.stream.end);
+        main.value = pos == p.stream.end ? p.parser.eofTerm : 0 /* Err */;
+        return main;
+    }
+    updateCachedToken(token, tokenizer, stack) {
+        tokenizer.token(this.stream.reset(stack.pos, token), stack);
+        if (token.value > -1) {
+            let { parser } = stack.p;
+            for (let i = 0; i < parser.specialized.length; i++)
+                if (parser.specialized[i] == token.value) {
+                    let result = parser.specializers[i](this.stream.read(token.start, token.end), stack);
+                    if (result >= 0 && stack.p.parser.dialect.allows(result >> 1)) {
+                        if ((result & 1) == 0 /* Specialize */)
+                            token.value = result >> 1;
+                        else
+                            token.extended = result >> 1;
+                        break;
+                    }
+                }
+        }
+        else {
+            token.value = 0 /* Err */;
+            token.end = Math.min(stack.p.stream.end, stack.pos + 1);
+        }
+    }
+    putAction(action, token, end, index) {
+        // Don't add duplicate actions
+        for (let i = 0; i < index; i += 3)
+            if (this.actions[i] == action)
+                return index;
+        this.actions[index++] = action;
+        this.actions[index++] = token;
+        this.actions[index++] = end;
+        return index;
+    }
+    addActions(stack, token, end, index) {
+        let { state } = stack, { parser } = stack.p, { data } = parser;
+        for (let set = 0; set < 2; set++) {
+            for (let i = parser.stateSlot(state, set ? 2 /* Skip */ : 1 /* Actions */);; i += 3) {
+                if (data[i] == 65535 /* End */) {
+                    if (data[i + 1] == 1 /* Next */) {
+                        i = pair(data, i + 2);
+                    }
+                    else {
+                        if (index == 0 && data[i + 1] == 2 /* Other */)
+                            index = this.putAction(pair(data, i + 2), token, end, index);
+                        break;
+                    }
+                }
+                if (data[i] == token)
+                    index = this.putAction(pair(data, i + 1), token, end, index);
+            }
+        }
+        return index;
+    }
+}
+var Rec;
+(function (Rec) {
+    Rec[Rec["Distance"] = 5] = "Distance";
+    Rec[Rec["MaxRemainingPerStep"] = 3] = "MaxRemainingPerStep";
+    // When two stacks have been running independently long enough to
+    // add this many elements to their buffers, prune one.
+    Rec[Rec["MinBufferLengthPrune"] = 500] = "MinBufferLengthPrune";
+    Rec[Rec["ForceReduceLimit"] = 10] = "ForceReduceLimit";
+    // Once a stack reaches this depth (in .stack.length) force-reduce
+    // it back to CutTo to avoid creating trees that overflow the stack
+    // on recursive traversal.
+    Rec[Rec["CutDepth"] = 15000] = "CutDepth";
+    Rec[Rec["CutTo"] = 9000] = "CutTo";
+})(Rec || (Rec = {}));
+class Parse {
+    constructor(parser, input, fragments, ranges) {
+        this.parser = parser;
+        this.input = input;
+        this.ranges = ranges;
+        this.recovering = 0;
+        this.nextStackID = 0x2654; // ♔, ♕, ♖, ♗, ♘, ♙, ♠, ♡, ♢, ♣, ♤, ♥, ♦, ♧
+        this.minStackPos = 0;
+        this.reused = [];
+        this.stoppedAt = null;
+        this.stream = new InputStream(input, ranges);
+        this.tokens = new TokenCache(parser, this.stream);
+        this.topTerm = parser.top[1];
+        let { from } = ranges[0];
+        this.stacks = [Stack.start(this, parser.top[0], from)];
+        this.fragments = fragments.length && this.stream.end - from > parser.bufferLength * 4
+            ? new FragmentCursor(fragments, parser.nodeSet) : null;
+    }
+    get parsedPos() {
+        return this.minStackPos;
+    }
+    // Move the parser forward. This will process all parse stacks at
+    // `this.pos` and try to advance them to a further position. If no
+    // stack for such a position is found, it'll start error-recovery.
+    //
+    // When the parse is finished, this will return a syntax tree. When
+    // not, it returns `null`.
+    advance() {
+        let stacks = this.stacks, pos = this.minStackPos;
+        // This will hold stacks beyond `pos`.
+        let newStacks = this.stacks = [];
+        let stopped, stoppedTokens;
+        // Keep advancing any stacks at `pos` until they either move
+        // forward or can't be advanced. Gather stacks that can't be
+        // advanced further in `stopped`.
+        for (let i = 0; i < stacks.length; i++) {
+            let stack = stacks[i];
+            for (;;) {
+                this.tokens.mainToken = null;
+                if (stack.pos > pos) {
+                    newStacks.push(stack);
+                }
+                else if (this.advanceStack(stack, newStacks, stacks)) {
+                    continue;
+                }
+                else {
+                    if (!stopped) {
+                        stopped = [];
+                        stoppedTokens = [];
+                    }
+                    stopped.push(stack);
+                    let tok = this.tokens.getMainToken(stack);
+                    stoppedTokens.push(tok.value, tok.end);
+                }
+                break;
+            }
+        }
+        if (!newStacks.length) {
+            let finished = stopped && findFinished(stopped);
+            if (finished)
+                return this.stackToTree(finished);
+            if (this.parser.strict) {
+                if (verbose && stopped)
+                    console.log("Stuck with token " + (this.tokens.mainToken ? this.parser.getName(this.tokens.mainToken.value) : "none"));
+                throw new SyntaxError("No parse at " + pos);
+            }
+            if (!this.recovering)
+                this.recovering = 5 /* Distance */;
+        }
+        if (this.recovering && stopped) {
+            let finished = this.stoppedAt != null && stopped[0].pos > this.stoppedAt ? stopped[0]
+                : this.runRecovery(stopped, stoppedTokens, newStacks);
+            if (finished)
+                return this.stackToTree(finished.forceAll());
+        }
+        if (this.recovering) {
+            let maxRemaining = this.recovering == 1 ? 1 : this.recovering * 3 /* MaxRemainingPerStep */;
+            if (newStacks.length > maxRemaining) {
+                newStacks.sort((a, b) => b.score - a.score);
+                while (newStacks.length > maxRemaining)
+                    newStacks.pop();
+            }
+            if (newStacks.some(s => s.reducePos > pos))
+                this.recovering--;
+        }
+        else if (newStacks.length > 1) {
+            // Prune stacks that are in the same state, or that have been
+            // running without splitting for a while, to avoid getting stuck
+            // with multiple successful stacks running endlessly on.
+            outer: for (let i = 0; i < newStacks.length - 1; i++) {
+                let stack = newStacks[i];
+                for (let j = i + 1; j < newStacks.length; j++) {
+                    let other = newStacks[j];
+                    if (stack.sameState(other) ||
+                        stack.buffer.length > 500 /* MinBufferLengthPrune */ && other.buffer.length > 500 /* MinBufferLengthPrune */) {
+                        if (((stack.score - other.score) || (stack.buffer.length - other.buffer.length)) > 0) {
+                            newStacks.splice(j--, 1);
+                        }
+                        else {
+                            newStacks.splice(i--, 1);
+                            continue outer;
+                        }
+                    }
+                }
+            }
+        }
+        this.minStackPos = newStacks[0].pos;
+        for (let i = 1; i < newStacks.length; i++)
+            if (newStacks[i].pos < this.minStackPos)
+                this.minStackPos = newStacks[i].pos;
+        return null;
+    }
+    stopAt(pos) {
+        if (this.stoppedAt != null && this.stoppedAt < pos)
+            throw new RangeError("Can't move stoppedAt forward");
+        this.stoppedAt = pos;
+    }
+    // Returns an updated version of the given stack, or null if the
+    // stack can't advance normally. When `split` and `stacks` are
+    // given, stacks split off by ambiguous operations will be pushed to
+    // `split`, or added to `stacks` if they move `pos` forward.
+    advanceStack(stack, stacks, split) {
+        let start = stack.pos, { parser } = this;
+        let base = verbose ? this.stackID(stack) + " -> " : "";
+        if (this.stoppedAt != null && start > this.stoppedAt)
+            return stack.forceReduce() ? stack : null;
+        if (this.fragments) {
+            let strictCx = stack.curContext && stack.curContext.tracker.strict, cxHash = strictCx ? stack.curContext.hash : 0;
+            for (let cached = this.fragments.nodeAt(start); cached;) {
+                let match = this.parser.nodeSet.types[cached.type.id] == cached.type ? parser.getGoto(stack.state, cached.type.id) : -1;
+                if (match > -1 && cached.length && (!strictCx || (cached.prop(NodeProp.contextHash) || 0) == cxHash)) {
+                    stack.useNode(cached, match);
+                    if (verbose)
+                        console.log(base + this.stackID(stack) + ` (via reuse of ${parser.getName(cached.type.id)})`);
+                    return true;
+                }
+                if (!(cached instanceof Tree) || cached.children.length == 0 || cached.positions[0] > 0)
+                    break;
+                let inner = cached.children[0];
+                if (inner instanceof Tree && cached.positions[0] == 0)
+                    cached = inner;
+                else
+                    break;
+            }
+        }
+        let defaultReduce = parser.stateSlot(stack.state, 4 /* DefaultReduce */);
+        if (defaultReduce > 0) {
+            stack.reduce(defaultReduce);
+            if (verbose)
+                console.log(base + this.stackID(stack) + ` (via always-reduce ${parser.getName(defaultReduce & 65535 /* ValueMask */)})`);
+            return true;
+        }
+        if (stack.stack.length >= 15000 /* CutDepth */) {
+            while (stack.stack.length > 9000 /* CutTo */ && stack.forceReduce()) { }
+        }
+        let actions = this.tokens.getActions(stack);
+        for (let i = 0; i < actions.length;) {
+            let action = actions[i++], term = actions[i++], end = actions[i++];
+            let last = i == actions.length || !split;
+            let localStack = last ? stack : stack.split();
+            localStack.apply(action, term, end);
+            if (verbose)
+                console.log(base + this.stackID(localStack) + ` (via ${(action & 65536 /* ReduceFlag */) == 0 ? "shift"
+                    : `reduce of ${parser.getName(action & 65535 /* ValueMask */)}`} for ${parser.getName(term)} @ ${start}${localStack == stack ? "" : ", split"})`);
+            if (last)
+                return true;
+            else if (localStack.pos > start)
+                stacks.push(localStack);
+            else
+                split.push(localStack);
+        }
+        return false;
+    }
+    // Advance a given stack forward as far as it will go. Returns the
+    // (possibly updated) stack if it got stuck, or null if it moved
+    // forward and was given to `pushStackDedup`.
+    advanceFully(stack, newStacks) {
+        let pos = stack.pos;
+        for (;;) {
+            if (!this.advanceStack(stack, null, null))
+                return false;
+            if (stack.pos > pos) {
+                pushStackDedup(stack, newStacks);
+                return true;
+            }
+        }
+    }
+    runRecovery(stacks, tokens, newStacks) {
+        let finished = null, restarted = false;
+        for (let i = 0; i < stacks.length; i++) {
+            let stack = stacks[i], token = tokens[i << 1], tokenEnd = tokens[(i << 1) + 1];
+            let base = verbose ? this.stackID(stack) + " -> " : "";
+            if (stack.deadEnd) {
+                if (restarted)
+                    continue;
+                restarted = true;
+                stack.restart();
+                if (verbose)
+                    console.log(base + this.stackID(stack) + " (restarted)");
+                let done = this.advanceFully(stack, newStacks);
+                if (done)
+                    continue;
+            }
+            let force = stack.split(), forceBase = base;
+            for (let j = 0; force.forceReduce() && j < 10 /* ForceReduceLimit */; j++) {
+                if (verbose)
+                    console.log(forceBase + this.stackID(force) + " (via force-reduce)");
+                let done = this.advanceFully(force, newStacks);
+                if (done)
+                    break;
+                if (verbose)
+                    forceBase = this.stackID(force) + " -> ";
+            }
+            for (let insert of stack.recoverByInsert(token)) {
+                if (verbose)
+                    console.log(base + this.stackID(insert) + " (via recover-insert)");
+                this.advanceFully(insert, newStacks);
+            }
+            if (this.stream.end > stack.pos) {
+                if (tokenEnd == stack.pos) {
+                    tokenEnd++;
+                    token = 0 /* Err */;
+                }
+                stack.recoverByDelete(token, tokenEnd);
+                if (verbose)
+                    console.log(base + this.stackID(stack) + ` (via recover-delete ${this.parser.getName(token)})`);
+                pushStackDedup(stack, newStacks);
+            }
+            else if (!finished || finished.score < stack.score) {
+                finished = stack;
+            }
+        }
+        return finished;
+    }
+    // Convert the stack's buffer to a syntax tree.
+    stackToTree(stack) {
+        stack.close();
+        return Tree.build({ buffer: StackBufferCursor.create(stack),
+            nodeSet: this.parser.nodeSet,
+            topID: this.topTerm,
+            maxBufferLength: this.parser.bufferLength,
+            reused: this.reused,
+            start: this.ranges[0].from,
+            length: stack.pos - this.ranges[0].from,
+            minRepeatType: this.parser.minRepeatTerm });
+    }
+    stackID(stack) {
+        let id = (stackIDs || (stackIDs = new WeakMap)).get(stack);
+        if (!id)
+            stackIDs.set(stack, id = String.fromCodePoint(this.nextStackID++));
+        return id + stack;
+    }
+}
+function pushStackDedup(stack, newStacks) {
+    for (let i = 0; i < newStacks.length; i++) {
+        let other = newStacks[i];
+        if (other.pos == stack.pos && other.sameState(stack)) {
+            if (newStacks[i].score < stack.score)
+                newStacks[i] = stack;
+            return;
+        }
+    }
+    newStacks.push(stack);
+}
+class Dialect {
+    constructor(source, flags, disabled) {
+        this.source = source;
+        this.flags = flags;
+        this.disabled = disabled;
+    }
+    allows(term) { return !this.disabled || this.disabled[term] == 0; }
+}
+const id = x => x;
+/// Context trackers are used to track stateful context (such as
+/// indentation in the Python grammar, or parent elements in the XML
+/// grammar) needed by external tokenizers. You declare them in a
+/// grammar file as `@context exportName from "module"`.
+///
+/// Context values should be immutable, and can be updated (replaced)
+/// on shift or reduce actions.
+///
+/// The export used in a `@context` declaration should be of this
+/// type.
+class ContextTracker {
+    /// Define a context tracker.
+    constructor(spec) {
+        this.start = spec.start;
+        this.shift = spec.shift || id;
+        this.reduce = spec.reduce || id;
+        this.reuse = spec.reuse || id;
+        this.hash = spec.hash || (() => 0);
+        this.strict = spec.strict !== false;
+    }
+}
+/// Holds the parse tables for a given grammar, as generated by
+/// `lezer-generator`, and provides [methods](#common.Parser) to parse
+/// content with.
+class LRParser extends Parser {
+    /// @internal
+    constructor(spec) {
+        super();
+        /// @internal
+        this.wrappers = [];
+        if (spec.version != 14 /* Version */)
+            throw new RangeError(`Parser version (${spec.version}) doesn't match runtime version (${14 /* Version */})`);
+        let nodeNames = spec.nodeNames.split(" ");
+        this.minRepeatTerm = nodeNames.length;
+        for (let i = 0; i < spec.repeatNodeCount; i++)
+            nodeNames.push("");
+        let topTerms = Object.keys(spec.topRules).map(r => spec.topRules[r][1]);
+        let nodeProps = [];
+        for (let i = 0; i < nodeNames.length; i++)
+            nodeProps.push([]);
+        function setProp(nodeID, prop, value) {
+            nodeProps[nodeID].push([prop, prop.deserialize(String(value))]);
+        }
+        if (spec.nodeProps)
+            for (let propSpec of spec.nodeProps) {
+                let prop = propSpec[0];
+                if (typeof prop == "string")
+                    prop = NodeProp[prop];
+                for (let i = 1; i < propSpec.length;) {
+                    let next = propSpec[i++];
+                    if (next >= 0) {
+                        setProp(next, prop, propSpec[i++]);
+                    }
+                    else {
+                        let value = propSpec[i + -next];
+                        for (let j = -next; j > 0; j--)
+                            setProp(propSpec[i++], prop, value);
+                        i++;
+                    }
+                }
+            }
+        this.nodeSet = new NodeSet(nodeNames.map((name, i) => NodeType.define({
+            name: i >= this.minRepeatTerm ? undefined : name,
+            id: i,
+            props: nodeProps[i],
+            top: topTerms.indexOf(i) > -1,
+            error: i == 0,
+            skipped: spec.skippedNodes && spec.skippedNodes.indexOf(i) > -1
+        })));
+        if (spec.propSources)
+            this.nodeSet = this.nodeSet.extend(...spec.propSources);
+        this.strict = false;
+        this.bufferLength = DefaultBufferLength;
+        let tokenArray = decodeArray(spec.tokenData);
+        this.context = spec.context;
+        this.specializerSpecs = spec.specialized || [];
+        this.specialized = new Uint16Array(this.specializerSpecs.length);
+        for (let i = 0; i < this.specializerSpecs.length; i++)
+            this.specialized[i] = this.specializerSpecs[i].term;
+        this.specializers = this.specializerSpecs.map(getSpecializer);
+        this.states = decodeArray(spec.states, Uint32Array);
+        this.data = decodeArray(spec.stateData);
+        this.goto = decodeArray(spec.goto);
+        this.maxTerm = spec.maxTerm;
+        this.tokenizers = spec.tokenizers.map(value => typeof value == "number" ? new TokenGroup(tokenArray, value) : value);
+        this.topRules = spec.topRules;
+        this.dialects = spec.dialects || {};
+        this.dynamicPrecedences = spec.dynamicPrecedences || null;
+        this.tokenPrecTable = spec.tokenPrec;
+        this.termNames = spec.termNames || null;
+        this.maxNode = this.nodeSet.types.length - 1;
+        this.dialect = this.parseDialect();
+        this.top = this.topRules[Object.keys(this.topRules)[0]];
+    }
+    createParse(input, fragments, ranges) {
+        let parse = new Parse(this, input, fragments, ranges);
+        for (let w of this.wrappers)
+            parse = w(parse, input, fragments, ranges);
+        return parse;
+    }
+    /// Get a goto table entry @internal
+    getGoto(state, term, loose = false) {
+        let table = this.goto;
+        if (term >= table[0])
+            return -1;
+        for (let pos = table[term + 1];;) {
+            let groupTag = table[pos++], last = groupTag & 1;
+            let target = table[pos++];
+            if (last && loose)
+                return target;
+            for (let end = pos + (groupTag >> 1); pos < end; pos++)
+                if (table[pos] == state)
+                    return target;
+            if (last)
+                return -1;
+        }
+    }
+    /// Check if this state has an action for a given terminal @internal
+    hasAction(state, terminal) {
+        let data = this.data;
+        for (let set = 0; set < 2; set++) {
+            for (let i = this.stateSlot(state, set ? 2 /* Skip */ : 1 /* Actions */), next;; i += 3) {
+                if ((next = data[i]) == 65535 /* End */) {
+                    if (data[i + 1] == 1 /* Next */)
+                        next = data[i = pair(data, i + 2)];
+                    else if (data[i + 1] == 2 /* Other */)
+                        return pair(data, i + 2);
+                    else
+                        break;
+                }
+                if (next == terminal || next == 0 /* Err */)
+                    return pair(data, i + 1);
+            }
+        }
+        return 0;
+    }
+    /// @internal
+    stateSlot(state, slot) {
+        return this.states[(state * 6 /* Size */) + slot];
+    }
+    /// @internal
+    stateFlag(state, flag) {
+        return (this.stateSlot(state, 0 /* Flags */) & flag) > 0;
+    }
+    /// @internal
+    validAction(state, action) {
+        if (action == this.stateSlot(state, 4 /* DefaultReduce */))
+            return true;
+        for (let i = this.stateSlot(state, 1 /* Actions */);; i += 3) {
+            if (this.data[i] == 65535 /* End */) {
+                if (this.data[i + 1] == 1 /* Next */)
+                    i = pair(this.data, i + 2);
+                else
+                    return false;
+            }
+            if (action == pair(this.data, i + 1))
+                return true;
+        }
+    }
+    /// Get the states that can follow this one through shift actions or
+    /// goto jumps. @internal
+    nextStates(state) {
+        let result = [];
+        for (let i = this.stateSlot(state, 1 /* Actions */);; i += 3) {
+            if (this.data[i] == 65535 /* End */) {
+                if (this.data[i + 1] == 1 /* Next */)
+                    i = pair(this.data, i + 2);
+                else
+                    break;
+            }
+            if ((this.data[i + 2] & (65536 /* ReduceFlag */ >> 16)) == 0) {
+                let value = this.data[i + 1];
+                if (!result.some((v, i) => (i & 1) && v == value))
+                    result.push(this.data[i], value);
+            }
+        }
+        return result;
+    }
+    /// @internal
+    overrides(token, prev) {
+        let iPrev = findOffset(this.data, this.tokenPrecTable, prev);
+        return iPrev < 0 || findOffset(this.data, this.tokenPrecTable, token) < iPrev;
+    }
+    /// Configure the parser. Returns a new parser instance that has the
+    /// given settings modified. Settings not provided in `config` are
+    /// kept from the original parser.
+    configure(config) {
+        // Hideous reflection-based kludge to make it easy to create a
+        // slightly modified copy of a parser.
+        let copy = Object.assign(Object.create(LRParser.prototype), this);
+        if (config.props)
+            copy.nodeSet = this.nodeSet.extend(...config.props);
+        if (config.top) {
+            let info = this.topRules[config.top];
+            if (!info)
+                throw new RangeError(`Invalid top rule name ${config.top}`);
+            copy.top = info;
+        }
+        if (config.tokenizers)
+            copy.tokenizers = this.tokenizers.map(t => {
+                let found = config.tokenizers.find(r => r.from == t);
+                return found ? found.to : t;
+            });
+        if (config.specializers) {
+            copy.specializers = this.specializers.slice();
+            copy.specializerSpecs = this.specializerSpecs.map((s, i) => {
+                let found = config.specializers.find(r => r.from == s.external);
+                if (!found)
+                    return s;
+                let spec = Object.assign(Object.assign({}, s), { external: found.to });
+                copy.specializers[i] = getSpecializer(spec);
+                return spec;
+            });
+        }
+        if (config.contextTracker)
+            copy.context = config.contextTracker;
+        if (config.dialect)
+            copy.dialect = this.parseDialect(config.dialect);
+        if (config.strict != null)
+            copy.strict = config.strict;
+        if (config.wrap)
+            copy.wrappers = copy.wrappers.concat(config.wrap);
+        if (config.bufferLength != null)
+            copy.bufferLength = config.bufferLength;
+        return copy;
+    }
+    /// Tells you whether any [parse wrappers](#lr.ParserConfig.wrap)
+    /// are registered for this parser.
+    hasWrappers() {
+        return this.wrappers.length > 0;
+    }
+    /// Returns the name associated with a given term. This will only
+    /// work for all terms when the parser was generated with the
+    /// `--names` option. By default, only the names of tagged terms are
+    /// stored.
+    getName(term) {
+        return this.termNames ? this.termNames[term] : String(term <= this.maxNode && this.nodeSet.types[term].name || term);
+    }
+    /// The eof term id is always allocated directly after the node
+    /// types. @internal
+    get eofTerm() { return this.maxNode + 1; }
+    /// The type of top node produced by the parser.
+    get topNode() { return this.nodeSet.types[this.top[1]]; }
+    /// @internal
+    dynamicPrecedence(term) {
+        let prec = this.dynamicPrecedences;
+        return prec == null ? 0 : prec[term] || 0;
+    }
+    /// @internal
+    parseDialect(dialect) {
+        let values = Object.keys(this.dialects), flags = values.map(() => false);
+        if (dialect)
+            for (let part of dialect.split(" ")) {
+                let id = values.indexOf(part);
+                if (id >= 0)
+                    flags[id] = true;
+            }
+        let disabled = null;
+        for (let i = 0; i < values.length; i++)
+            if (!flags[i]) {
+                for (let j = this.dialects[values[i]], id; (id = this.data[j++]) != 65535 /* End */;)
+                    (disabled || (disabled = new Uint8Array(this.maxTerm + 1)))[id] = 1;
+            }
+        return new Dialect(dialect, flags, disabled);
+    }
+    /// Used by the output of the parser generator. Not available to
+    /// user code.
+    static deserialize(spec) {
+        return new LRParser(spec);
+    }
+}
+function pair(data, off) { return data[off] | (data[off + 1] << 16); }
+function findOffset(data, start, term) {
+    for (let i = start, next; (next = data[i]) != 65535 /* End */; i++)
+        if (next == term)
+            return i - start;
+    return -1;
+}
+function findFinished(stacks) {
+    let best = null;
+    for (let stack of stacks) {
+        let stopped = stack.p.stoppedAt;
+        if ((stack.pos == stack.p.stream.end || stopped != null && stack.pos > stopped) &&
+            stack.p.parser.stateFlag(stack.state, 2 /* Accepting */) &&
+            (!best || best.score < stack.score))
+            best = stack;
+    }
+    return best;
+}
+function getSpecializer(spec) {
+    if (spec.external) {
+        let mask = spec.extend ? 1 /* Extend */ : 0 /* Specialize */;
+        return (value, stack) => (spec.external(value, stack) << 1) | mask;
+    }
+    return spec.get;
+}
+
+// This file was generated by lezer-generator. You probably shouldn't edit it.
+const TSExtends = 1,
+  noSemi = 281,
+  incdec = 2,
+  incdecPrefix = 3,
+  templateContent = 282,
+  InterpolationStart = 4,
+  templateEnd = 283,
+  insertSemi = 284,
+  spaces = 286,
+  newline = 287,
+  LineComment = 5,
+  BlockComment = 6,
+  Dialect_ts = 1;
+
+/* Hand-written tokenizers for JavaScript tokens that can't be
+   expressed by lezer's built-in tokenizer. */
+
+const space = [9, 10, 11, 12, 13, 32, 133, 160, 5760, 8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199, 8200,
+               8201, 8202, 8232, 8233, 8239, 8287, 12288];
+
+const braceR = 125, braceL = 123, semicolon = 59, slash = 47, star = 42,
+      plus = 43, minus = 45, dollar = 36, backtick = 96, backslash = 92;
+
+const trackNewline = new ContextTracker({
+  start: false,
+  shift(context, term) {
+    return term == LineComment || term == BlockComment || term == spaces ? context : term == newline
+  },
+  strict: false
+});
+
+const insertSemicolon = new ExternalTokenizer((input, stack) => {
+  let {next} = input;
+  if ((next == braceR || next == -1 || stack.context) && stack.canShift(insertSemi))
+    input.acceptToken(insertSemi);
+}, {contextual: true, fallback: true});
+
+const noSemicolon = new ExternalTokenizer((input, stack) => {
+  let {next} = input, after;
+  if (space.indexOf(next) > -1) return
+  if (next == slash && ((after = input.peek(1)) == slash || after == star)) return
+  if (next != braceR && next != semicolon && next != -1 && !stack.context && stack.canShift(noSemi))
+    input.acceptToken(noSemi);
+}, {contextual: true});
+
+const incdecToken = new ExternalTokenizer((input, stack) => {
+  let {next} = input;
+  if (next == plus || next == minus) {
+    input.advance();
+    if (next == input.next) {
+      input.advance();
+      let mayPostfix = !stack.context && stack.canShift(incdec);
+      input.acceptToken(mayPostfix ? incdec : incdecPrefix);
+    }
+  }
+}, {contextual: true});
+
+const template = new ExternalTokenizer(input => {
+  for (let afterDollar = false, i = 0;; i++) {
+    let {next} = input;
+    if (next < 0) {
+      if (i) input.acceptToken(templateContent);
+      break
+    } else if (next == backtick) {
+      if (i) input.acceptToken(templateContent);
+      else input.acceptToken(templateEnd, 1);
+      break
+    } else if (next == braceL && afterDollar) {
+      if (i == 1) input.acceptToken(InterpolationStart, 1);
+      else input.acceptToken(templateContent, -1);
+      break
+    } else if (next == 10 /* "\n" */ && i) {
+      // Break up template strings on lines, to avoid huge tokens
+      input.advance();
+      input.acceptToken(templateContent);
+      break
+    } else if (next == backslash) {
+      input.advance();
+    }
+    afterDollar = next == dollar;
+    input.advance();
+  }
+});
+
+const tsExtends = new ExternalTokenizer((input, stack) => {
+  if (input.next != 101 || !stack.dialectEnabled(Dialect_ts)) return
+  input.advance();
+  for (let i = 0; i < 6; i++) {
+    if (input.next != "xtends".charCodeAt(i)) return
+    input.advance();
+  }
+  if (input.next >= 57 && input.next <= 65 || input.next >= 48 && input.next <= 90 ||
+      input.next == 95 || input.next >= 97 && input.next <= 122 || input.next > 160) return
+  input.acceptToken(TSExtends);
+});
+
+const jsHighlight = styleTags({
+  "get set async static": tags.modifier,
+  "for while do if else switch try catch finally return throw break continue default case": tags.controlKeyword,
+  "in of await yield void typeof delete instanceof": tags.operatorKeyword,
+  "let var const function class extends": tags.definitionKeyword,
+  "import export from": tags.moduleKeyword,
+  "with debugger as new": tags.keyword,
+  TemplateString: tags.special(tags.string),
+  super: tags.atom,
+  BooleanLiteral: tags.bool,
+  this: tags.self,
+  null: tags.null,
+  Star: tags.modifier,
+  VariableName: tags.variableName,
+  "CallExpression/VariableName TaggedTemplateExpression/VariableName": tags.function(tags.variableName),
+  VariableDefinition: tags.definition(tags.variableName),
+  Label: tags.labelName,
+  PropertyName: tags.propertyName,
+  PrivatePropertyName: tags.special(tags.propertyName),
+  "CallExpression/MemberExpression/PropertyName": tags.function(tags.propertyName),
+  "FunctionDeclaration/VariableDefinition": tags.function(tags.definition(tags.variableName)),
+  "ClassDeclaration/VariableDefinition": tags.definition(tags.className),
+  PropertyDefinition: tags.definition(tags.propertyName),
+  PrivatePropertyDefinition: tags.definition(tags.special(tags.propertyName)),
+  UpdateOp: tags.updateOperator,
+  LineComment: tags.lineComment,
+  BlockComment: tags.blockComment,
+  Number: tags.number,
+  String: tags.string,
+  ArithOp: tags.arithmeticOperator,
+  LogicOp: tags.logicOperator,
+  BitOp: tags.bitwiseOperator,
+  CompareOp: tags.compareOperator,
+  RegExp: tags.regexp,
+  Equals: tags.definitionOperator,
+  Arrow: tags.function(tags.punctuation),
+  ": Spread": tags.punctuation,
+  "( )": tags.paren,
+  "[ ]": tags.squareBracket,
+  "{ }": tags.brace,
+  "InterpolationStart InterpolationEnd": tags.special(tags.brace),
+  ".": tags.derefOperator,
+  ", ;": tags.separator,
+
+  TypeName: tags.typeName,
+  TypeDefinition: tags.definition(tags.typeName),
+  "type enum interface implements namespace module declare": tags.definitionKeyword,
+  "abstract global Privacy readonly override": tags.modifier,
+  "is keyof unique infer": tags.operatorKeyword,
+
+  JSXAttributeValue: tags.attributeValue,
+  JSXText: tags.content,
+  "JSXStartTag JSXStartCloseTag JSXSelfCloseEndTag JSXEndTag": tags.angleBracket,
+  "JSXIdentifier JSXNameSpacedName": tags.tagName,
+  "JSXAttribute/JSXIdentifier JSXAttribute/JSXNameSpacedName": tags.attributeName
+});
+
+// This file was generated by lezer-generator. You probably shouldn't edit it.
+const spec_identifier = {__proto__:null,export:18, as:23, from:29, default:32, async:37, function:38, this:48, true:56, false:56, void:66, typeof:70, null:86, super:88, new:122, await:139, yield:141, delete:142, class:152, extends:154, public:197, private:197, protected:197, readonly:199, instanceof:220, in:222, const:224, import:256, keyof:307, unique:311, infer:317, is:351, abstract:371, implements:373, type:375, let:378, var:380, interface:387, enum:391, namespace:397, module:399, declare:403, global:407, for:428, of:437, while:440, with:444, do:448, if:452, else:454, switch:458, case:464, try:470, catch:474, finally:478, return:482, throw:486, break:490, continue:494, debugger:498};
+const spec_word = {__proto__:null,async:109, get:111, set:113, public:161, private:161, protected:161, static:163, abstract:165, override:167, readonly:173, new:355};
+const spec_LessThan = {__proto__:null,"<":129};
+const parser = LRParser.deserialize({
+  version: 14,
+  states: "$8SO`QdOOO'QQ(C|O'#ChO'XOWO'#DVO)dQdO'#D]O)tQdO'#DhO){QdO'#DrO-xQdO'#DxOOQO'#E]'#E]O.]Q`O'#E[O.bQ`O'#E[OOQ(C['#Ef'#EfO0aQ(C|O'#ItO2wQ(C|O'#IuO3eQ`O'#EzO3jQ!bO'#FaOOQ(C['#FS'#FSO3rO#tO'#FSO4QQ&jO'#FhO5bQ`O'#FgOOQ(C['#Iu'#IuOOQ(CW'#It'#ItOOQS'#J^'#J^O5gQ`O'#HpO5lQ(ChO'#HqOOQS'#Ih'#IhOOQS'#Hr'#HrQ`QdOOO){QdO'#DjO5tQ`O'#G[O5yQ&jO'#CmO6XQ`O'#EZO6dQ`O'#EgO6iQ,UO'#FRO7TQ`O'#G[O7YQ`O'#G`O7eQ`O'#G`O7sQ`O'#GcO7sQ`O'#GdO7sQ`O'#GfO5tQ`O'#GiO8dQ`O'#GlO9rQ`O'#CdO:SQ`O'#GyO:[Q`O'#HPO:[Q`O'#HRO`QdO'#HTO:[Q`O'#HVO:[Q`O'#HYO:aQ`O'#H`O:fQ(CjO'#HfO){QdO'#HhO:qQ(CjO'#HjO:|Q(CjO'#HlO5lQ(ChO'#HnO){QdO'#DWOOOW'#Ht'#HtO;XOWO,59qOOQ(C[,59q,59qO=jQtO'#ChO=tQdO'#HuO>XQ`O'#IvO@WQtO'#IvO'dQdO'#IvO@_Q`O,59wO@uQ7[O'#DbOAnQ`O'#E]OA{Q`O'#JROBWQ`O'#JQOBWQ`O'#JQOB`Q`O,5:yOBeQ`O'#JPOBlQaO'#DyO5yQ&jO'#EZOBzQ`O'#EZOCVQpO'#FROOQ(C[,5:S,5:SOC_QdO,5:SOE]Q(C|O,5:^OEyQ`O,5:dOFdQ(ChO'#JOO7YQ`O'#I}OFkQ`O'#I}OFsQ`O,5:xOFxQ`O'#I}OGWQdO,5:vOIWQ&jO'#EWOJeQ`O,5:vOKwQ&jO'#DlOLOQdO'#DqOLYQ7[O,5;PO){QdO,5;POOQS'#Er'#ErOOQS'#Et'#EtO){QdO,5;RO){QdO,5;RO){QdO,5;RO){QdO,5;RO){QdO,5;RO){QdO,5;RO){QdO,5;RO){QdO,5;RO){QdO,5;RO){QdO,5;RO){QdO,5;ROOQS'#Ex'#ExOLbQdO,5;cOOQ(C[,5;h,5;hOOQ(C[,5;i,5;iONbQ`O,5;iOOQ(C[,5;j,5;jO){QdO'#IPONgQ(ChO,5<TO! RQ&jO,5;RO){QdO,5;fO! kQ!bO'#JVO! YQ!bO'#JVO! rQ!bO'#JVO!!TQ!bO,5;qOOOO,5;{,5;{O!!cQdO'#FcOOOO'#IO'#IOO3rO#tO,5;nO!!jQ!bO'#FeOOQ(C[,5;n,5;nO!#WQ,VO'#CrOOQ(C]'#Cu'#CuO!#kQ`O'#CuO!#pOWO'#CyO!$^Q,VO,5<QO!$eQ`O,5<SO!%tQ&jO'#FrO!&RQ`O'#FsO!&WQ`O'#FsO!&]Q&jO'#FwO!'[Q7[O'#F{O!'}Q,VO'#IqOOQ(C]'#Iq'#IqO!(XQaO'#IpO!(gQ`O'#IoO!(oQ`O'#CqOOQ(C]'#Cs'#CsOOQ(C]'#C|'#C|O!(wQ`O'#DOOJjQ&jO'#FjOJjQ&jO'#FlO!(|Q`O'#FnO!)RQ`O'#FoO!&WQ`O'#FuOJjQ&jO'#FzO!)WQ`O'#E^O!)oQ`O,5<RO`QdO,5>[OOQS'#Ik'#IkOOQS,5>],5>]OOQS-E;p-E;pO!+kQ(C|O,5:UOOQ(CX'#Cp'#CpO!,[Q&kO,5<vOOQO'#Cf'#CfO!,mQ(ChO'#IlO5bQ`O'#IlO:aQ`O,59XO!-OQ!bO,59XO!-WQ&jO,59XO5yQ&jO,59XO!-cQ`O,5:vO!-kQ`O'#GxO!-yQ`O'#JbO){QdO,5;kO!.RQ7[O,5;mO!.WQ`O,5=cO!.]Q`O,5=cO!.bQ`O,5=cO5lQ(ChO,5=cO5tQ`O,5<vO!.pQ`O'#E_O!/UQ7[O'#E`OOQ(CW'#JP'#JPO!/gQ(ChO'#J_O5lQ(ChO,5<zO7sQ`O,5=QOOQP'#Cr'#CrO!/rQ!bO,5<}O!/zQ!cO,5=OO!0VQ`O,5=QO!0[QpO,5=TO:aQ`O'#GnO5tQ`O'#GpO!0dQ`O'#GpO5yQ&jO'#GsO!0iQ`O'#GsOOQS,5=W,5=WO!0nQ`O'#GtO!0vQ`O'#CmO!0{Q`O,59OO!1VQ`O,59OO!3XQdO,59OOOQS,59O,59OO!3fQ(ChO,59OO){QdO,59OO!3qQdO'#G{OOQS'#G|'#G|OOQS'#G}'#G}O`QdO,5=eO!4RQ`O,5=eO){QdO'#DxO`QdO,5=kO`QdO,5=mO!4WQ`O,5=oO`QdO,5=qO!4]Q`O,5=tO!4bQdO,5=zOOQS,5>Q,5>QO){QdO,5>QO5lQ(ChO,5>SOOQS,5>U,5>UO!8cQ`O,5>UOOQS,5>W,5>WO!8cQ`O,5>WOOQS,5>Y,5>YO!8hQpO,59rOOOW-E;r-E;rOOQ(C[1G/]1G/]O!8mQtO,5>aO'dQdO,5>aOOQO,5>f,5>fO!8wQdO'#HuOOQO-E;s-E;sO!9UQ`O,5?bO!9^QtO,5?bO!9eQ`O,5?lOOQ(C[1G/c1G/cO!9mQ!bO'#DTOOQO'#Ix'#IxO){QdO'#IxO!:[Q!bO'#IxO!:yQ!bO'#DcO!;[Q7[O'#DcO!=gQdO'#DcO!=nQ`O'#IwO!=vQ`O,59|O!={Q`O'#EaO!>ZQ`O'#JSO!>cQ`O,5:zO!>yQ7[O'#DcO){QdO,5?mO!?TQ`O'#HzOOQO-E;x-E;xO!9eQ`O,5?lOOQ(CW1G0e1G0eO!@aQ7[O'#D|OOQ(C[,5:e,5:eO){QdO,5:eOIWQ&jO,5:eO!@hQaO,5:eO:aQ`O,5:uO!-OQ!bO,5:uO!-WQ&jO,5:uO5yQ&jO,5:uOOQ(C[1G/n1G/nOOQ(C[1G0O1G0OOOQ(CW'#EV'#EVO){QdO,5?jO!@sQ(ChO,5?jO!AUQ(ChO,5?jO!A]Q`O,5?iO!AeQ`O'#H|O!A]Q`O,5?iOOQ(CW1G0d1G0dO7YQ`O,5?iOOQ(C[1G0b1G0bO!BPQ(C|O1G0bO!CRQ(CyO,5:rOOQ(C]'#Fq'#FqO!CoQ(C}O'#IqOGWQdO1G0bO!EqQ,VO'#IyO!E{Q`O,5:WO!FQQtO'#IzO){QdO'#IzO!F[Q`O,5:]OOQ(C]'#DT'#DTOOQ(C[1G0k1G0kO!FaQ`O1G0kO!HrQ(C|O1G0mO!HyQ(C|O1G0mO!K^Q(C|O1G0mO!KeQ(C|O1G0mO!MlQ(C|O1G0mO!NPQ(C|O1G0mO#!pQ(C|O1G0mO#!wQ(C|O1G0mO#%[Q(C|O1G0mO#%cQ(C|O1G0mO#'WQ(C|O1G0mO#*QQMlO'#ChO#+{QMlO1G0}O#-vQMlO'#IuOOQ(C[1G1T1G1TO#.ZQ(C|O,5>kOOQ(CW-E;}-E;}O#.zQ(C}O1G0mOOQ(C[1G0m1G0mO#1PQ(C|O1G1QO#1pQ!bO,5;sO#1uQ!bO,5;tO#1zQ!bO'#F[O#2`Q`O'#FZOOQO'#JW'#JWOOQO'#H}'#H}O#2eQ!bO1G1]OOQ(C[1G1]1G1]OOOO1G1f1G1fO#2sQMlO'#ItO#2}Q`O,5;}OLbQdO,5;}OOOO-E;|-E;|OOQ(C[1G1Y1G1YOOQ(C[,5<P,5<PO#3SQ!bO,5<POOQ(C],59a,59aOIWQ&jO'#C{OOOW'#Hs'#HsO#3XOWO,59eOOQ(C],59e,59eO){QdO1G1lO!)RQ`O'#IRO#3dQ`O,5<eOOQ(C],5<b,5<bOOQO'#GV'#GVOJjQ&jO,5<pOOQO'#GX'#GXOJjQ&jO,5<rOIWQ&jO,5<tOOQO1G1n1G1nO#3oQqO'#CpO#4SQqO,5<^O#4ZQ`O'#JZO5tQ`O'#JZO#4iQ`O,5<`OJjQ&jO,5<_O#4nQ`O'#FtO#4yQ`O,5<_O#5OQqO'#FqO#5]QqO'#J[O#5gQ`O'#J[OIWQ&jO'#J[O#5lQ`O,5<cOOQ(CW'#Dg'#DgO#5qQ!bO'#F|O!'VQ7[O'#F|O!'VQ7[O'#GOO#6SQ`O'#GPO!&WQ`O'#GSO#6XQ(ChO'#ITO#6dQ7[O,5<gOOQ(C],5<g,5<gO#6kQ7[O'#F|O#6yQ7[O'#F}O#7RQ7[O'#F}OOQ(C],5<u,5<uOJjQ&jO,5?[OJjQ&jO,5?[O#7WQ`O'#IUO#7cQ`O,5?ZO#7kQ`O,59]OOQ(C]'#Ch'#ChO#8[Q,VO,59jOOQ(C],59j,59jO#8}Q,VO,5<UO#9pQ,VO,5<WO#9zQ`O,5<YOOQ(C],5<Z,5<ZO#:PQ`O,5<aO#:UQ,VO,5<fOGWQdO1G1mO#:fQ`O1G1mOOQS1G3v1G3vOOQ(C[1G/p1G/pONbQ`O1G/pOOQS1G2b1G2bOIWQ&jO1G2bO){QdO1G2bOIWQ&jO1G2bO#:kQaO1G2bO#<QQ&jO'#EWOOQ(CW,5?W,5?WO#<[Q(ChO,5?WOOQS1G.s1G.sO:aQ`O1G.sO!-OQ!bO1G.sO!-WQ&jO1G.sO#<mQ`O1G0bO#<rQ`O'#ChO#<}Q`O'#JcO#=VQ`O,5=dO#=[Q`O'#JcO#=aQ`O'#JcO#=iQ`O'#I^O#=wQ`O,5?|O#>PQtO1G1VOOQ(C[1G1X1G1XO5tQ`O1G2}O#>WQ`O1G2}O#>]Q`O1G2}O#>bQ`O1G2}OOQS1G2}1G2}O#>gQ&kO1G2bO7YQ`O'#JQO7YQ`O'#EaO7YQ`O'#IWO#>xQ(ChO,5?yOOQS1G2f1G2fO!0VQ`O1G2lOIWQ&jO1G2iO#?TQ`O1G2iOOQS1G2j1G2jOIWQ&jO1G2jO#?YQaO1G2jO#?bQ7[O'#GhOOQS1G2l1G2lO!'VQ7[O'#IYO!0[QpO1G2oOOQS1G2o1G2oOOQS,5=Y,5=YO#?jQ&kO,5=[O5tQ`O,5=[O#6SQ`O,5=_O5bQ`O,5=_O!-OQ!bO,5=_O!-WQ&jO,5=_O5yQ&jO,5=_O#?{Q`O'#JaO#@WQ`O,5=`OOQS1G.j1G.jO#@]Q(ChO1G.jO#@hQ`O1G.jO#@mQ`O1G.jO5lQ(ChO1G.jO#@uQtO,5@OO#APQ`O,5@OO#A[QdO,5=gO#AcQ`O,5=gO7YQ`O,5@OOOQS1G3P1G3PO`QdO1G3POOQS1G3V1G3VOOQS1G3X1G3XO:[Q`O1G3ZO#AhQdO1G3]O#EcQdO'#H[OOQS1G3`1G3`O#EpQ`O'#HbO:aQ`O'#HdOOQS1G3f1G3fO#ExQdO1G3fO5lQ(ChO1G3lOOQS1G3n1G3nOOQ(CW'#Fx'#FxO5lQ(ChO1G3pO5lQ(ChO1G3rOOOW1G/^1G/^O#IvQpO,5<TO#JOQtO1G3{OOQO1G4Q1G4QO){QdO,5>aO#JYQ`O1G4|O#JbQ`O1G5WO#JjQ`O,5?dOLbQdO,5:{O7YQ`O,5:{O:aQ`O,59}OLbQdO,59}O!-OQ!bO,59}O#JoQMlO,59}OOQO,5:{,5:{O#JyQ7[O'#HvO#KaQ`O,5?cOOQ(C[1G/h1G/hO#KiQ7[O'#H{O#K}Q`O,5?nOOQ(CW1G0f1G0fO!;[Q7[O,59}O#LVQtO1G5XO7YQ`O,5>fOOQ(CW'#ES'#ESO#LaQ(DjO'#ETO!@XQ7[O'#D}OOQO'#Hy'#HyO#L{Q7[O,5:hOOQ(C[,5:h,5:hO#MSQ7[O'#D}O#MeQ7[O'#D}O#MlQ7[O'#EYO#MoQ7[O'#ETO#M|Q7[O'#ETO!@XQ7[O'#ETO#NaQ`O1G0PO#NfQqO1G0POOQ(C[1G0P1G0PO){QdO1G0POIWQ&jO1G0POOQ(C[1G0a1G0aO:aQ`O1G0aO!-OQ!bO1G0aO!-WQ&jO1G0aO#NmQ(C|O1G5UO){QdO1G5UO#N}Q(ChO1G5UO$ `Q`O1G5TO7YQ`O,5>hOOQO,5>h,5>hO$ hQ`O,5>hOOQO-E;z-E;zO$ `Q`O1G5TO$ vQ(C}O,59jO$#xQ(C}O,5<UO$%}Q(C}O,5<WO$(SQ(C}O,5<fOOQ(C[7+%|7+%|O$*_Q(C|O7+%|O$+OQ&jO'#HwO$+YQ`O,5?eOOQ(C]1G/r1G/rO$+bQdO'#HxO$+oQ`O,5?fO$+wQtO,5?fOOQ(C[1G/w1G/wOOQ(C[7+&V7+&VO$,RQMlO,5:^O){QdO7+&iO$,]QMlO,5:UOOQO1G1_1G1_OOQO1G1`1G1`O$,jQ!LQO,5;vOLbQdO,5;uOOQO-E;{-E;{OOQ(C[7+&w7+&wOOOO7+'Q7+'QOOOO1G1i1G1iO$,uQ`O1G1iOOQ(C[1G1k1G1kO$,zQqO,59gOOOW-E;q-E;qOOQ(C]1G/P1G/PO$-RQ(C|O7+'WOOQ(C],5>m,5>mO$-rQ`O,5>mOOQ(C]1G2P1G2PP$-wQ`O'#IRPOQ(C]-E<P-E<PO$.hQ,VO1G2[O$/ZQ,VO1G2^O$/eQqO1G2`OOQ(C]1G1x1G1xO$/lQ`O'#IQO$/zQ`O,5?uO$/zQ`O,5?uO$0SQ`O,5?uO$0_Q`O,5?uOOQO1G1z1G1zO$0mQ,VO1G1yOJjQ&jO1G1yO$0}Q&jO'#ISO$1_Q`O,5?vOIWQ&jO,5?vO$1gQqO,5?vOOQ(C]1G1}1G1}OOQ(CW,5<h,5<hOOQ(CW,5<i,5<iO$1qQ`O,5<iO#5}Q`O,5<iO!-OQ!bO,5<hO$1vQ`O,5<jOOQ(CW,5<k,5<kO$1qQ`O,5<nOOQO,5>o,5>oOOQO-E<R-E<ROOQ(C]1G2R1G2RO!'VQ7[O,5<hO$2OQ`O,5<iO!'VQ7[O,5<jO!'VQ7[O,5<iO$2ZQ,VO1G4vO$2eQ,VO1G4vOOQO,5>p,5>pOOQO-E<S-E<SOOQP1G.w1G.wO!.RQ7[O,59lO){QdO,59lO$2rQ`O1G1tOJjQ&jO1G1{O$2wQ(C|O7+'XOOQ(C[7+'X7+'XOGWQdO7+'XOOQ(C[7+%[7+%[O$3hQqO'#J]O#NaQ`O7+'|O$3rQ`O7+'|O$3zQqO7+'|OOQS7+'|7+'|OIWQ&jO7+'|O){QdO7+'|OIWQ&jO7+'|O$4UQ(CyO'#ChO$4iQ(CyO,5<lO$5ZQ`O,5<lOOQ(CW1G4r1G4rOOQS7+$_7+$_O:aQ`O7+$_O!-OQ!bO7+$_OGWQdO7+%|O$5`Q`O'#I]O$5qQ`O,5?}OOQO1G3O1G3OO5tQ`O,5?}O$5qQ`O,5?}O$5yQ`O,5?}OOQO,5>x,5>xOOQO-E<[-E<[OOQ(C[7+&q7+&qO$6OQ`O7+(iO5lQ(ChO7+(iO5tQ`O7+(iO$6TQ`O7+(iO$6YQaO7+'|OOQ(CW,5>r,5>rOOQ(CW-E<U-E<UOOQS7+(W7+(WO$6hQ(CyO7+(TOIWQ&jO7+(TO$6rQqO7+(UOOQS7+(U7+(UOIWQ&jO7+(UO$6yQ`O'#J`O$7UQ`O,5=SOOQO,5>t,5>tOOQO-E<W-E<WOOQS7+(Z7+(ZO$8OQ7[O'#GqOOQS1G2v1G2vOIWQ&jO1G2vO){QdO1G2vOIWQ&jO1G2vO$8VQaO1G2vO$8eQ&kO1G2vO5lQ(ChO1G2yO#6SQ`O1G2yO5bQ`O1G2yO!-OQ!bO1G2yO!-WQ&jO1G2yO$8vQ`O'#I[O$9RQ`O,5?{O$9ZQ7[O,5?{OOQ(CW1G2z1G2zOOQS7+$U7+$UO$9cQ`O7+$UO5lQ(ChO7+$UO$9hQ`O7+$UO){QdO1G5jO){QdO1G5kO$9mQdO1G3RO$9tQ`O1G3RO$9yQdO1G3RO$:QQ(ChO1G5jOOQS7+(k7+(kO5lQ(ChO7+(uO`QdO7+(wOOQS'#Jf'#JfOOQS'#I_'#I_O$:[QdO,5=vOOQS,5=v,5=vO){QdO'#H]O$:iQ`O'#H_OOQS,5=|,5=|O7YQ`O,5=|OOQS,5>O,5>OOOQS7+)Q7+)QOOQS7+)W7+)WOOQS7+)[7+)[OOQS7+)^7+)^OOQO1G5O1G5OO$:nQMlO1G0gO$:xQ`O1G0gOOQO1G/i1G/iO$;TQMlO1G/iO:aQ`O1G/iOLbQdO'#DcOOQO,5>b,5>bOOQO-E;t-E;tOOQO,5>g,5>gOOQO-E;y-E;yO!-OQ!bO1G/iO:aQ`O,5:iOOQO,5:o,5:oO){QdO,5:oO$;_Q(ChO,5:oO$;jQ(ChO,5:oO!-OQ!bO,5:iOOQO-E;w-E;wOOQ(C[1G0S1G0SO!@XQ7[O,5:iO$;xQ7[O,5:iO$<ZQ(DjO,5:oO$<uQ7[O,5:iO!@XQ7[O,5:oOOQO,5:t,5:tO$<|Q7[O,5:oO$=ZQ(ChO,5:oOOQ(C[7+%k7+%kO#NaQ`O7+%kO#NfQqO7+%kOOQ(C[7+%{7+%{O:aQ`O7+%{O!-OQ!bO7+%{O$=oQ(C|O7+*pO){QdO7+*pOOQO1G4S1G4SO7YQ`O1G4SO$>PQ`O7+*oO$>XQ(C}O1G2[O$@^Q(C}O1G2^O$BcQ(C}O1G1yO$DnQ,VO,5>cOOQO-E;u-E;uO$DxQtO,5>dO){QdO,5>dOOQO-E;v-E;vO$ESQ`O1G5QO$E[QMlO1G0bO$GcQMlO1G0mO$GjQMlO1G0mO$IkQMlO1G0mO$IrQMlO1G0mO$KgQMlO1G0mO$KzQMlO1G0mO$NXQMlO1G0mO$N`QMlO1G0mO%!aQMlO1G0mO%!hQMlO1G0mO%$]QMlO1G0mO%$pQ(C|O<<JTO%%rQMmO1G0mO%'|QMmO'#IqO%)iQMlO1G1QOLbQdO'#F^OOQO'#JX'#JXOOQO1G1b1G1bO%)vQ`O1G1aO%){QMlO,5>kOOOO7+'T7+'TOOOW1G/R1G/ROOQ(C]1G4X1G4XOJjQ&jO7+'zO%*VQ`O,5>lO5tQ`O,5>lOOQO-E<O-E<OO%*eQ`O1G5aO%*eQ`O1G5aO%*mQ`O1G5aO%*xQ,VO7+'eO%+YQqO,5>nO%+dQ`O,5>nOIWQ&jO,5>nOOQO-E<Q-E<QO%+iQqO1G5bO%+sQ`O1G5bOOQ(CW1G2T1G2TO$1qQ`O1G2TOOQ(CW1G2S1G2SO%+{Q`O1G2UOIWQ&jO1G2UOOQ(CW1G2Y1G2YO!-OQ!bO1G2SO#5}Q`O1G2TO%,QQ`O1G2UO%,YQ`O1G2TOJjQ&jO7+*bOOQ(C]1G/W1G/WO%,eQ`O1G/WOOQ(C]7+'`7+'`O%,jQ,VO7+'gO%,zQ(C|O<<JsOOQ(C[<<Js<<JsOIWQ&jO'#IVO%-kQ`O,5?wOOQS<<Kh<<KhOIWQ&jO<<KhO#NaQ`O<<KhO%-sQ`O<<KhO%-{QqO<<KhOIWQ&jO1G2WOOQS<<Gy<<GyO:aQ`O<<GyO%.VQ(C|O<<IhOOQ(C[<<Ih<<IhOOQO,5>w,5>wO%.vQ`O,5>wO%.{Q`O,5>wOOQO-E<Z-E<ZO%/TQ`O1G5iO%/TQ`O1G5iO5tQ`O1G5iO%/]Q`O<<LTOOQS<<LT<<LTO%/bQ`O<<LTO5lQ(ChO<<LTO){QdO<<KhOIWQ&jO<<KhOOQS<<Ko<<KoO$6hQ(CyO<<KoOOQS<<Kp<<KpO$6rQqO<<KpO%/gQ7[O'#IXO%/rQ`O,5?zOLbQdO,5?zOOQS1G2n1G2nO#LaQ(DjO'#ETO!@XQ7[O'#GrOOQO'#IZ'#IZO%/zQ7[O,5=]OOQS,5=],5=]O%0RQ7[O'#ETO%0^Q7[O'#ETO%0uQ7[O'#ETO%1PQ7[O'#GrO%1bQ`O7+(bO%1gQ`O7+(bO%1oQqO7+(bOOQS7+(b7+(bOIWQ&jO7+(bO){QdO7+(bOIWQ&jO7+(bO%1yQaO7+(bOOQS7+(e7+(eO5lQ(ChO7+(eO#6SQ`O7+(eO5bQ`O7+(eO!-OQ!bO7+(eO%2XQ`O,5>vOOQO-E<Y-E<YOOQO'#Gu'#GuO%2dQ`O1G5gO5lQ(ChO<<GpOOQS<<Gp<<GpO%2lQ`O<<GpO%2qQ`O7++UO%2vQ`O7++VOOQS7+(m7+(mO%2{Q`O7+(mO%3QQdO7+(mO%3XQ`O7+(mO){QdO7++UO){QdO7++VOOQS<<La<<LaOOQS<<Lc<<LcOOQS-E<]-E<]OOQS1G3b1G3bO%3^Q`O,5=wOOQS,5=y,5=yO%3cQ`O1G3hOLbQdO7+&ROOQO7+%T7+%TO%3hQMlO1G5XO:aQ`O7+%TOOQO1G0T1G0TO%3rQ(C|O1G0ZOOQO1G0Z1G0ZO){QdO1G0ZO%3|Q(ChO1G0ZO:aQ`O1G0TO!-OQ!bO1G0TO!@XQ7[O1G0TO%4XQ(ChO1G0ZO%4gQ7[O1G0TO%4xQ(ChO1G0ZO%5^Q(DjO1G0ZO%5hQ7[O1G0TO!@XQ7[O1G0ZOOQ(C[<<IV<<IVOOQ(C[<<Ig<<IgO:aQ`O<<IgO%5oQ(C|O<<N[OOQO7+)n7+)nO%6PQ(C}O7+'eO%8[Q(C}O7+'gO%:gQtO1G4OO%:qQMlO7+%|O%;gQMmO,59jO%=hQMmO,5<UO%?lQMmO,5<WO%A[QMmO,5<fO%B}QMlO7+'WO%C[QMlO7+'XO%CiQ`O,5;xOOQO7+&{7+&{O%CnQ,VO<<KfOOQO1G4W1G4WO%CuQ`O1G4WO%DQQ`O1G4WO%D`Q`O7+*{O%D`Q`O7+*{OIWQ&jO1G4YO%DhQqO1G4YO%DrQ`O7+*|OOQ(CW7+'o7+'oO$1qQ`O7+'pO%DzQqO7+'pOOQ(CW7+'n7+'nO$1qQ`O7+'oO%ERQ`O7+'pOIWQ&jO7+'pO#5}Q`O7+'oO%EWQ,VO<<M|OOQ(C]7+$r7+$rO%EbQqO,5>qOOQO-E<T-E<TO#NaQ`OANASOOQSANASANASOIWQ&jOANASO%ElQ(CyO7+'rOOQSAN=eAN=eO5tQ`O1G4cOOQO1G4c1G4cO%E|Q`O1G4cO%FRQ`O7++TO%FRQ`O7++TO5lQ(ChOANAoO%FZQ`OANAoOOQSANAoANAoO%F`Q`OANASO%FhQqOANASOOQSANAZANAZOOQSANA[ANA[O%FrQ`O,5>sOOQO-E<V-E<VO%F}QMlO1G5fO#6SQ`O,5=^O5bQ`O,5=^O!-OQ!bO,5=^OOQO-E<X-E<XOOQS1G2w1G2wO$<ZQ(DjO,5:oO!@XQ7[O,5=^O%GXQ7[O,5=^O%GjQ7[O,5:oOOQS<<K|<<K|OIWQ&jO<<K|O%1bQ`O<<K|O%GtQ`O<<K|O%G|QqO<<K|O){QdO<<K|OIWQ&jO<<K|OOQS<<LP<<LPO5lQ(ChO<<LPO#6SQ`O<<LPO5bQ`O<<LPO%HWQ7[O1G4bO%H`Q`O7++ROOQSAN=[AN=[O5lQ(ChOAN=[OOQS<<Np<<NpOOQS<<Nq<<NqOOQS<<LX<<LXO%HhQ`O<<LXO%HmQdO<<LXO%HtQ`O<<NpO%HyQ`O<<NqOOQS1G3c1G3cO:aQ`O7+)SO%IOQMlO<<ImOOQO<<Ho<<HoOOQO7+%u7+%uO%3rQ(C|O7+%uO){QdO7+%uOOQO7+%o7+%oO:aQ`O7+%oO!-OQ!bO7+%oO%IYQ(ChO7+%uO!@XQ7[O7+%oO%IeQ(ChO7+%uO%IsQ7[O7+%oO%JUQ(ChO7+%uOOQ(C[AN?RAN?RO%JjQMlO<<JTO%JwQMmO1G1yO%MOQMmO1G2[O& SQMmO1G2^O&!rQMlO<<JsO&#PQMlO<<IhOOQO1G1d1G1dOJjQ&jOANAQOOQO7+)r7+)rO&#^Q`O7+)rO&#iQ`O<<NgO&#qQqO7+)tOOQ(CW<<K[<<K[O$1qQ`O<<K[OOQ(CW<<KZ<<KZO&#{QqO<<K[O$1qQ`O<<KZOOQSG26nG26nO#NaQ`OG26nOOQO7+)}7+)}O5tQ`O7+)}O&$SQ`O<<NoOOQSG27ZG27ZO5lQ(ChOG27ZOIWQ&jOG26nOLbQdO1G4_O&$[Q`O7++QO5lQ(ChO1G2xO#6SQ`O1G2xO5bQ`O1G2xO!-OQ!bO1G2xO!@XQ7[O1G2xO%5^Q(DjO1G0ZO&$dQ7[O1G2xO%1bQ`OANAhOOQSANAhANAhOIWQ&jOANAhO&$uQ`OANAhO&$}QqOANAhOOQSANAkANAkO5lQ(ChOANAkO#6SQ`OANAkOOQO'#Gv'#GvOOQO7+)|7+)|OOQSG22vG22vOOQSANAsANAsO&%XQ`OANAsOOQSAND[AND[OOQSAND]AND]OOQS<<Ln<<LnOOQO<<Ia<<IaO%3rQ(C|O<<IaOOQO<<IZ<<IZO:aQ`O<<IZO){QdO<<IaO!-OQ!bO<<IZO&%^Q(ChO<<IaO!@XQ7[O<<IZO&%iQ(ChO<<IaO&%wQMmO7+'eO&'jQMmO7+'gO&)]Q,VOG26lOOQO<<M^<<M^OOQ(CWAN@vAN@vO$1qQ`OAN@vOOQ(CWAN@uAN@uOOQSLD,YLD,YOOQO<<Mi<<MiOOQSLD,uLD,uO#NaQ`OLD,YO&)mQMlO7+)yOOQO7+(d7+(dO5lQ(ChO7+(dO#6SQ`O7+(dO5bQ`O7+(dO!-OQ!bO7+(dO!@XQ7[O7+(dOOQSG27SG27SO%1bQ`OG27SOIWQ&jOG27SOOQSG27VG27VO5lQ(ChOG27VOOQSG27_G27_OOQOAN>{AN>{OOQOAN>uAN>uO%3rQ(C|OAN>{O:aQ`OAN>uO){QdOAN>{O!-OQ!bOAN>uO&)wQ(ChOAN>{O&*SQ(C}OG26lOOQ(CWG26bG26bOOQS!$( t!$( tOOQO<<LO<<LOO5lQ(ChO<<LOO#6SQ`O<<LOO5bQ`O<<LOO!-OQ!bO<<LOOOQSLD,nLD,nO%1bQ`OLD,nOOQSLD,qLD,qOOQOG24gG24gOOQOG24aG24aO%3rQ(C|OG24gO:aQ`OG24aO){QdOG24gO&,pQ!LRO,5:rO&-gQ$ITO'#IqOOQOANAjANAjO5lQ(ChOANAjO#6SQ`OANAjO5bQ`OANAjOOQS!$(!Y!$(!YOOQOLD*RLD*ROOQOLD){LD){O%3rQ(C|OLD*RO&.ZQMmOG26lO&/|Q!LRO,59jO&0pQ!LRO,5<UO&1dQ!LRO,5<WO&2WQ!LRO,5<fOOQOG27UG27UO5lQ(ChOG27UO#6SQ`OG27UOOQO!$'Mm!$'MmO&2}Q!LRO1G2[O&3qQ!LRO1G2^O&4eQ!LRO1G1yOOQOLD,pLD,pO5lQ(ChOLD,pO&5[Q!LRO7+'eO&6RQ!LRO7+'gOOQO!$(![!$(![O&6xQ!LROG26lOLbQdO'#DrO&7oQtO'#ItOLbQdO'#DjO&7vQ(C|O'#ChO&8aQtO'#ChO&8qQdO,5:vO&:qQ&jO'#EWOLbQdO,5;ROLbQdO,5;ROLbQdO,5;ROLbQdO,5;ROLbQdO,5;ROLbQdO,5;ROLbQdO,5;ROLbQdO,5;ROLbQdO,5;ROLbQdO,5;ROLbQdO,5;ROLbQdO'#IPO&<OQ`O,5<TO&=eQ&jO,5;ROLbQdO,5;fO!(wQ`O'#DOO!(wQ`O'#DOO!(wQ`O'#DOOIWQ&jO'#FjO&:qQ&jO'#FjO&<WQ&jO'#FjOIWQ&jO'#FlO&:qQ&jO'#FlO&<WQ&jO'#FlOIWQ&jO'#FzO&:qQ&jO'#FzO&<WQ&jO'#FzOLbQdO,5?mO&8qQdO1G0bO&=lQMlO'#ChOLbQdO1G1lOIWQ&jO,5<pO&:qQ&jO,5<pO&<WQ&jO,5<pOIWQ&jO,5<rO&:qQ&jO,5<rO&<WQ&jO,5<rOIWQ&jO,5<_O&:qQ&jO,5<_O&<WQ&jO,5<_O&8qQdO1G1mOLbQdO7+&iOIWQ&jO1G1yO&:qQ&jO1G1yO&<WQ&jO1G1yOIWQ&jO1G1{O&:qQ&jO1G1{O&<WQ&jO1G1{O&8qQdO7+'XO&8qQdO7+%|O&=vQ`O7+'pOIWQ&jOANAQO&:qQ&jOANAQO&<WQ&jOANAQO&=vQ`O<<K[O&=vQ`OAN@vO&={Q`O'#E[O&>QQ`O'#E[O&>YQ`O'#EzO&>_Q`O'#EgO&>dQ`O'#JRO&>oQ`O'#JPO&>zQ`O,5:vO&?PQ,VO,5<QO&?WQ`O'#FsO&?]Q`O'#FsO&?bQ`O'#FsO&?gQ`O,5<RO&?oQ`O,5:vO&?wQMlO1G0}O&@OQ`O,5<_O&@TQ`O,5<_O&@YQ`O,5<_O&@_Q`O,5<aO&@dQ`O,5<aO&@iQ`O,5<aO&@nQ`O1G1mO&@sQ`O1G0bO&@xQ`O1G2UO&@}Q,VO<<KfO&AUQ,VO<<KfO&A]Q,VO<<KfO&AdQqO7+'pO&AkQ`O7+'pO&ApQqO<<K[O4QQ&jO'#FhO5bQ`O'#FgOBzQ`O'#EZOLbQdO,5;cO!&WQ`O'#FsO!&WQ`O'#FsO!&WQ`O'#FsO!&WQ`O'#FuO!&WQ`O'#FuO!&WQ`O'#FuO&AwQ`O,5<jOJjQ&jO7+'zOJjQ&jO7+'zOJjQ&jO7+'zOIWQ&jO1G2UO&BPQ`O1G2UOIWQ&jO7+'pO!'VQ7[O'#GOO$/eQqO1G2`O$/eQqO1G2`O$/eQqO1G2`O!'VQ7[O,5<jOIWQ&jO,5<tOIWQ&jO,5<tOIWQ&jO,5<t",
+  stateData: "&B}~O'YOS'ZOSTOSUOS~OQTORTOXyO]cO_hObnOcmOhcOjTOkcOlcOqTOsTOxRO{cO|cO}cO!TSO!_kO!dUO!gTO!hTO!iTO!jTO!kTO!nlO#dsO#tpO#x^O%PqO%RtO%TrO%UrO%XuO%ZvO%^wO%_wO%axO%nzO%t{O%v|O%x}O%z!OO%}!PO&T!QO&Z!RO&]!SO&_!TO&a!UO&c!VO']PO'fQO'oYO'|aO~OQ[XZ[X_[Xj[Xu[Xv[Xx[X!R[X!a[X!b[X!d[X!j[X!{[X#WdX#[[X#][X#^[X#_[X#`[X#a[X#b[X#c[X#e[X#g[X#i[X#j[X#o[X'W[X'f[X'p[X'w[X'x[X~O!]$lX~P$zOS!WO'U!XO'V!ZO~OQTORTO]cOb!kOc!jOhcOjTOkcOlcOqTOsTOxRO{cO|cO}cO!T!bO!_kO!dUO!gTO!hTO!iTO!jTO!kTO!n!iO#t!lO#x^O']![O'fQO'oYO'|aO~O!Q!`O!R!]O!O'jP!O'tP~P'dO!S!mO~P`OQTORTO]cOb!kOc!jOhcOjTOkcOlcOqTOsTOxRO{cO|cO}cO!T!bO!_kO!dUO!gTO!hTO!iTO!jTO!kTO!n!iO#t!lO#x^O']9aO'fQO'oYO'|aO~OQTORTO]cOb!kOc!jOhcOjTOkcOlcOqTOsTOxRO{cO|cO}cO!T!bO!_kO!dUO!gTO!hTO!iTO!jTO!kTO!n!iO#t!lO#x^O'fQO'oYO'|aO~O!Q!rO#U!uO#V!rO']9bO!c'qP~P+{O#W!vO~O!]!wO#W!vO~OQ#^OZ#dOj#ROu!{Ov!{Ox!|O!R#bO!a#TO!b!yO!d!zO!j#^O#[#PO#]#QO#^#QO#_#QO#`#SO#a#TO#b#TO#c#TO#e#UO#g#WO#i#YO#j#ZO'fQO'p#[O'w!}O'x#OO~O_'hX'W'hX!c'hX!O'hX!T'hX%Q'hX!]'hX~P.jO!{#eO#o#eOQ'iXZ'iX_'iXj'iXu'iXv'iXx'iX!R'iX!a'iX!b'iX!d'iX!j'iX#['iX#]'iX#^'iX#_'iX#`'iX#a'iX#b'iX#e'iX#g'iX#i'iX#j'iX'f'iX'p'iX'w'iX'x'iX~O#c'iX'W'iX!O'iX!c'iXn'iX!T'iX%Q'iX!]'iX~P0zO!{#eO~O#z#fO$R#jO~O!T#kO#x^O$U#lO$W#nO~O]#qOh$QOj#rOk#qOl#qOq$ROs$SOx#yO!T#zO!_$XO!d#vO#V$YO#t$VO$_$TO$a$UO$d$WO']#pO'b$PO'f#sO'a'cP~O!d$ZO~O!]$]O~O_$^O'W$^O~O']$bO~O!d$ZO']$bO'^$dO'b$PO~Oc$jO!d$ZO']$bO~O#c#TO~O]$sOu$oO!T$lO!d$nO%R$rO']$bO'^$dO^(UP~O!n$tO~Ox$uO!T$vO']$bO~Ox$uO!T$vO%Z$zO']$bO~O']${O~O#dsO%RtO%TrO%UrO%XuO%ZvO%^wO%_wO~Ob%UOc%TO!n%RO%P%SO%c%QO~P7xOb%XOcmO!T%WO!nlO#dsO%PqO%TrO%UrO%XuO%ZvO%^wO%_wO%axO~O`%[O!{%_O%R%YO'^$dO~P8wO!d%`O!g%dO~O!d%eO~O!TSO~O_$^O'T%mO'W$^O~O_$^O'T%pO'W$^O~O_$^O'T%rO'W$^O~OS!WO'U!XO'V%vO~OQ[XZ[Xj[Xu[Xv[Xx[X!R[X!RdX!a[X!b[X!d[X!j[X!{[X!{dX#WdX#[[X#][X#^[X#_[X#`[X#a[X#b[X#c[X#e[X#g[X#i[X#j[X#o[X'f[X'p[X'w[X'x[X~O!O[X!OdX~P;dO!Q%xO!O&iX!O&nX!R&iX!R&nX~P'dO!R%zO!O'jX~OQ#^OZ#dOj#ROu!{Ov!{Ox!|O!R%zO!a#TO!b!yO!d!zO!j#^O#[#PO#]#QO#^#QO#_#QO#`#SO#a#TO#b#TO#c#TO#e#UO#g#WO#i#YO#j#ZO'fQO'p#[O'w!}O'x#OO~O!O'jX~P>aO!O&PO~Ox&SO!W&^O!X&VO!Y&VO'^$dO~O]&TOk&TO!Q&WO'g&QO!S'kP!S'vP~P@dO!O'sX!R'sX!]'sX!c'sX'p'sX~O!{'sX#W#PX!S'sX~PA]O!{&_O!O'uX!R'uX~O!R&`O!O'tX~O!O&cO~O!{#eO~PA]OP&gO!T&dO!o&fO']$bO~Oc&lO!d$ZO']$bO~Ou$oO!d$nO~O!S&mO~P`Ou!{Ov!{Ox!|O!b!yO!d!zO'fQOQ!faZ!faj!fa!R!fa!a!fa!j!fa#[!fa#]!fa#^!fa#_!fa#`!fa#a!fa#b!fa#c!fa#e!fa#g!fa#i!fa#j!fa'p!fa'w!fa'x!fa~O_!fa'W!fa!O!fa!c!fan!fa!T!fa%Q!fa!]!fa~PCfO!c&nO~O!]!wO!{&pO'p&oO!R'rX_'rX'W'rX~O!c'rX~PFOO!R&tO!c'qX~O!c&vO~Ox$uO!T$vO#V&wO']$bO~OQTORTO]cOb!kOc!jOhcOjTOkcOlcOqTOsTOxRO{cO|cO}cO!TSO!_kO!dUO!gTO!hTO!iTO!jTO!kTO!n!iO#t!lO#x^O']9aO'fQO'oYO'|aO~O]#qOh$QOj#rOk#qOl#qOq$ROs9tOx#yO!T#zO!_;eO!d#vO#V9}O#t$VO$_9wO$a9zO$d$WO']&{O'b$PO'f#sO~O#W&}O~O]#qOh$QOj#rOk#qOl#qOq$ROs$SOx#yO!T#zO!_$XO!d#vO#V$YO#t$VO$_$TO$a$UO$d$WO']&{O'b$PO'f#sO~O'a'mP~PJjO!Q'RO!c'nP~P){O'g'TO'oYO~OQ9^OR9^O]cOb;`Oc!jOhcOj9^OkcOlcOq9^Os9^OxRO{cO|cO}cO!T!bO!_9`O!dUO!g9^O!h9^O!i9^O!j9^O!k9^O!n!iO#t!lO#x^O']'cO'fQO'oYO'|;^O~O!d!zO~O!R#bO_$]a'W$]a!c$]a!O$]a!T$]a%Q$]a!]$]a~O#d'jO~PIWO!]'lO!T'yX#w'yX#z'yX$R'yX~Ou'mO~P! YOu'mO!T'yX#w'yX#z'yX$R'yX~O!T'oO#w'sO#z'nO$R'tO~O!Q'wO~PLbO#z#fO$R'zO~OP$eXu$eXx$eX!b$eX'w$eX'x$eX~OPfX!RfX!{fX'afX'a$eX~P!!rOk'|O~OS'}O'U(OO'V(QO~OP(ZOu(SOx(TO'w(VO'x(XO~O'a(RO~P!#{O'a([O~O]#qOh$QOj#rOk#qOl#qOq$ROs9tOx#yO!T#zO!_;eO!d#vO#V9}O#t$VO$_9wO$a9zO$d$WO'b$PO'f#sO~O!Q(`O'](]O!c'}P~P!$jO#W(bO~O!d(cO~O!Q(hO'](eO!O(OP~P!$jOj(uOx(mO!W(sO!X(lO!Y(lO!d(cO!x(tO$w(oO'^$dO'g(jO~O!S(rO~P!&jO!b!yOP'eXu'eXx'eX'w'eX'x'eX!R'eX!{'eX~O'a'eX#m'eX~P!'cOP(xO!{(wO!R'dX'a'dX~O!R(yO'a'cX~O']${O'a'cP~O'](|O~O!d)RO~O']&{O~Ox$uO!Q!rO!T$vO#U!uO#V!rO']$bO!c'qP~O!]!wO#W)VO~OQ#^OZ#dOj#ROu!{Ov!{Ox!|O!a#TO!b!yO!d!zO!j#^O#[#PO#]#QO#^#QO#_#QO#`#SO#a#TO#b#TO#c#TO#e#UO#g#WO#i#YO#j#ZO'fQO'p#[O'w!}O'x#OO~O_!^a!R!^a'W!^a!O!^a!c!^an!^a!T!^a%Q!^a!]!^a~P!)wOP)_O!T&dO!o)^O%Q)]O'b$PO~O!])aO!T'`X_'`X!R'`X'W'`X~O!d$ZO'b$PO~O!d$ZO']$bO'b$PO~O!]!wO#W&}O~O])lO%R)mO'])iO!S(VP~O!R)nO^(UX~O'g'TO~OZ)rO~O^)sO~O!T$lO']$bO'^$dO^(UP~Ox$uO!Q)xO!R&`O!T$vO']$bO!O'tP~O]&ZOk&ZO!Q)yO'g'TO!S'vP~O!R)zO_(RX'W(RX~O!{*OO'b$PO~OP*RO!T#zO'b$PO~O!T*TO~Ou*VO!TSO~O!n*[O~Oc*aO~O'](|O!S(TP~Oc$jO~O%RtO']${O~P8wOZ*gO^*fO~OQTORTO]cObnOcmOhcOjTOkcOlcOqTOsTOxRO{cO|cO}cO!_kO!dUO!gTO!hTO!iTO!jTO!kTO!nlO#x^O%PqO'fQO'oYO'|aO~O!T!bO#t!lO']9aO~P!1_O^*fO_$^O'W$^O~O_*kO#d*mO%T*mO%U*mO~P){O!d%`O~O%t*rO~O!T*tO~O&V*vO&X*wOQ&SaR&SaX&Sa]&Sa_&Sab&Sac&Sah&Saj&Sak&Sal&Saq&Sas&Sax&Sa{&Sa|&Sa}&Sa!T&Sa!_&Sa!d&Sa!g&Sa!h&Sa!i&Sa!j&Sa!k&Sa!n&Sa#d&Sa#t&Sa#x&Sa%P&Sa%R&Sa%T&Sa%U&Sa%X&Sa%Z&Sa%^&Sa%_&Sa%a&Sa%n&Sa%t&Sa%v&Sa%x&Sa%z&Sa%}&Sa&T&Sa&Z&Sa&]&Sa&_&Sa&a&Sa&c&Sa'S&Sa']&Sa'f&Sa'o&Sa'|&Sa!S&Sa%{&Sa`&Sa&Q&Sa~O']*|O~On+PO~O!O&ia!R&ia~P!)wO!Q+TO!O&iX!R&iX~P){O!R%zO!O'ja~O!O'ja~P>aO!R&`O!O'ta~O!RwX!R!ZX!SwX!S!ZX!]wX!]!ZX!d!ZX!{wX'b!ZX~O!]+YO!{+XO!R#TX!R'lX!S#TX!S'lX!]'lX!d'lX'b'lX~O!]+[O!d$ZO'b$PO!R!VX!S!VX~O]&ROk&ROx&SO'g(jO~OQ9^OR9^O]cOb;`Oc!jOhcOj9^OkcOlcOq9^Os9^OxRO{cO|cO}cO!T!bO!_9`O!dUO!g9^O!h9^O!i9^O!j9^O!k9^O!n!iO#t!lO#x^O'fQO'oYO'|;^O~O']:SO~P!;jO!R+`O!S'kX~O!S+bO~O!]+YO!{+XO!R#TX!S#TX~O!R+cO!S'vX~O!S+eO~O]&ROk&ROx&SO'^$dO'g(jO~O!X+fO!Y+fO~P!>hOx$uO!Q+hO!T$vO']$bO!O&nX!R&nX~O_+lO!W+oO!X+kO!Y+kO!r+sO!s+qO!t+rO!u+pO!x+tO'^$dO'g(jO'o+iO~O!S+nO~P!?iOP+yO!T&dO!o+xO~O!{,PO!R'ra!c'ra_'ra'W'ra~O!]!wO~P!@sO!R&tO!c'qa~Ox$uO!Q,SO!T$vO#U,UO#V,SO']$bO!R&pX!c&pX~O_#Oi!R#Oi'W#Oi!O#Oi!c#Oin#Oi!T#Oi%Q#Oi!]#Oi~P!)wOP;tOu(SOx(TO'w(VO'x(XO~O#W!za!R!za!c!za!{!za!T!za_!za'W!za!O!za~P!BpO#W'eXQ'eXZ'eX_'eXj'eXv'eX!a'eX!d'eX!j'eX#['eX#]'eX#^'eX#_'eX#`'eX#a'eX#b'eX#c'eX#e'eX#g'eX#i'eX#j'eX'W'eX'f'eX'p'eX!c'eX!O'eX!T'eXn'eX%Q'eX!]'eX~P!'cO!R,_O'a'mX~P!#{O'a,aO~O!R,bO!c'nX~P!)wO!c,eO~O!O,fO~OQ#^Ou!{Ov!{Ox!|O!b!yO!d!zO!j#^O'fQOZ#Zi_#Zij#Zi!R#Zi!a#Zi#]#Zi#^#Zi#_#Zi#`#Zi#a#Zi#b#Zi#c#Zi#e#Zi#g#Zi#i#Zi#j#Zi'W#Zi'p#Zi'w#Zi'x#Zi!O#Zi!c#Zin#Zi!T#Zi%Q#Zi!]#Zi~O#[#Zi~P!FfO#[#PO~P!FfOQ#^Ou!{Ov!{Ox!|O!b!yO!d!zO!j#^O#[#PO#]#QO#^#QO#_#QO'fQOZ#Zi_#Zi!R#Zi!a#Zi#`#Zi#a#Zi#b#Zi#c#Zi#e#Zi#g#Zi#i#Zi#j#Zi'W#Zi'p#Zi'w#Zi'x#Zi!O#Zi!c#Zin#Zi!T#Zi%Q#Zi!]#Zi~Oj#Zi~P!IQOj#RO~P!IQOQ#^Oj#ROu!{Ov!{Ox!|O!b!yO!d!zO!j#^O#[#PO#]#QO#^#QO#_#QO#`#SO'fQO_#Zi!R#Zi#e#Zi#g#Zi#i#Zi#j#Zi'W#Zi'p#Zi'w#Zi'x#Zi!O#Zi!c#Zin#Zi!T#Zi%Q#Zi!]#Zi~OZ#Zi!a#Zi#a#Zi#b#Zi#c#Zi~P!KlOZ#dO!a#TO#a#TO#b#TO#c#TO~P!KlOQ#^OZ#dOj#ROu!{Ov!{Ox!|O!a#TO!b!yO!d!zO!j#^O#[#PO#]#QO#^#QO#_#QO#`#SO#a#TO#b#TO#c#TO#e#UO'fQO_#Zi!R#Zi#g#Zi#i#Zi#j#Zi'W#Zi'p#Zi'x#Zi!O#Zi!c#Zin#Zi!T#Zi%Q#Zi!]#Zi~O'w#Zi~P!NdO'w!}O~P!NdOQ#^OZ#dOj#ROu!{Ov!{Ox!|O!a#TO!b!yO!d!zO!j#^O#[#PO#]#QO#^#QO#_#QO#`#SO#a#TO#b#TO#c#TO#e#UO#g#WO'fQO'w!}O_#Zi!R#Zi#i#Zi#j#Zi'W#Zi'p#Zi!O#Zi!c#Zin#Zi!T#Zi%Q#Zi!]#Zi~O'x#Zi~P##OO'x#OO~P##OOQ#^OZ#dOj#ROu!{Ov!{Ox!|O!a#TO!b!yO!d!zO!j#^O#[#PO#]#QO#^#QO#_#QO#`#SO#a#TO#b#TO#c#TO#e#UO#g#WO#i#YO'fQO'w!}O'x#OO~O_#Zi!R#Zi#j#Zi'W#Zi'p#Zi!O#Zi!c#Zin#Zi!T#Zi%Q#Zi!]#Zi~P#%jOQ[XZ[Xj[Xu[Xv[Xx[X!a[X!b[X!d[X!j[X!{[X#WdX#[[X#][X#^[X#_[X#`[X#a[X#b[X#c[X#e[X#g[X#i[X#j[X#o[X'f[X'p[X'w[X'x[X!R[X!S[X~O#m[X~P#'}OQ#^OZ9rOj9gOu!{Ov!{Ox!|O!a9iO!b!yO!d!zO!j#^O#[9eO#]9fO#^9fO#_9fO#`9hO#a9iO#b9iO#c9iO#e9jO#g9lO#i9nO#j9oO'fQO'p#[O'w!}O'x#OO~O#m,hO~P#*XOQ'iXZ'iXj'iXu'iXv'iXx'iX!a'iX!b'iX!d'iX!j'iX#['iX#]'iX#^'iX#_'iX#`'iX#a'iX#b'iX#e'iX#g'iX#i'iX#j'iX'f'iX'p'iX'w'iX'x'iX!R'iX~O!{9sO#o9sO#c'iX#m'iX!S'iX~P#,SO_&sa!R&sa'W&sa!c&san&sa!O&sa!T&sa%Q&sa!]&sa~P!)wOQ#ZiZ#Zi_#Zij#Ziv#Zi!R#Zi!a#Zi!b#Zi!d#Zi!j#Zi#[#Zi#]#Zi#^#Zi#_#Zi#`#Zi#a#Zi#b#Zi#c#Zi#e#Zi#g#Zi#i#Zi#j#Zi'W#Zi'f#Zi'p#Zi!O#Zi!c#Zin#Zi!T#Zi%Q#Zi!]#Zi~P!BpO_#ni!R#ni'W#ni!O#ni!c#nin#ni!T#ni%Q#ni!]#ni~P!)wO#z,jO~O#z,kO~O!]'lO!{,lO!T$OX#w$OX#z$OX$R$OX~O!Q,mO~O!T'oO#w,oO#z'nO$R,pO~O!R9pO!S'hX~P#*XO!S,qO~O$R,sO~OS'}O'U(OO'V,vO~O],yOk,yO!O,zO~O!RdX!]dX!cdX!c$eX'pdX~P!!rO!c-QO~P!BpO!R-RO!]!wO'p&oO!c'}X~O!c-WO~O!Q(`O']$bO!c'}P~O#W-YO~O!O$eX!R$eX!]$lX~P!!rO!R-ZO!O(OX~P!BpO!]-]O~O!O-_O~Oj-cO!]!wO!d$ZO'b$PO'p&oO~O!])aO~O_$^O!R-hO'W$^O~O!S-jO~P!&jO!X-kO!Y-kO'^$dO'g(jO~Ox-mO'g(jO~O!x-nO~O']${O!R&xX'a&xX~O!R(yO'a'ca~O'a-sO~Ou-tOv-tOx-uOPra'wra'xra!Rra!{ra~O'ara#mra~P#7pOu(SOx(TOP$^a'w$^a'x$^a!R$^a!{$^a~O'a$^a#m$^a~P#8fOu(SOx(TOP$`a'w$`a'x$`a!R$`a!{$`a~O'a$`a#m$`a~P#9XO]-vO~O#W-wO~O'a$na!R$na!{$na#m$na~P!#{O#W-zO~OP.TO!T&dO!o.SO%Q.RO~O]#qOj#rOk#qOl#qOq$ROs9tOx#yO!T#zO!_;eO!d#vO#V9}O#t$VO$_9wO$a9zO$d$WO'b$PO'f#sO~Oh.VO'].UO~P#:yO!])aO!T'`a_'`a!R'`a'W'`a~O#W.]O~OZ[X!RdX!SdX~O!R.^O!S(VX~O!S.`O~OZ.aO~O].cO'])iO~O!T$lO']$bO^'QX!R'QX~O!R)nO^(Ua~O!c.fO~P!)wO].hO~OZ.iO~O^.jO~OP.TO!T&dO!o.SO%Q.RO'b$PO~O!R)zO_(Ra'W(Ra~O!{.pO~OP.sO!T#zO~O'g'TO!S(SP~OP.}O!T.yO!o.|O%Q.{O'b$PO~OZ/XO!R/VO!S(TX~O!S/YO~O^/[O_$^O'W$^O~O]/]O~O]/^O'](|O~O#c/_O%r/`O~P0zO!{#eO#c/_O%r/`O~O_/aO~P){O_/cO~O%{/gOQ%yiR%yiX%yi]%yi_%yib%yic%yih%yij%yik%yil%yiq%yis%yix%yi{%yi|%yi}%yi!T%yi!_%yi!d%yi!g%yi!h%yi!i%yi!j%yi!k%yi!n%yi#d%yi#t%yi#x%yi%P%yi%R%yi%T%yi%U%yi%X%yi%Z%yi%^%yi%_%yi%a%yi%n%yi%t%yi%v%yi%x%yi%z%yi%}%yi&T%yi&Z%yi&]%yi&_%yi&a%yi&c%yi'S%yi']%yi'f%yi'o%yi'|%yi!S%yi`%yi&Q%yi~O`/mO!S/kO&Q/lO~P`O!TSO!d/oO~O&X*wOQ&SiR&SiX&Si]&Si_&Sib&Sic&Sih&Sij&Sik&Sil&Siq&Sis&Six&Si{&Si|&Si}&Si!T&Si!_&Si!d&Si!g&Si!h&Si!i&Si!j&Si!k&Si!n&Si#d&Si#t&Si#x&Si%P&Si%R&Si%T&Si%U&Si%X&Si%Z&Si%^&Si%_&Si%a&Si%n&Si%t&Si%v&Si%x&Si%z&Si%}&Si&T&Si&Z&Si&]&Si&_&Si&a&Si&c&Si'S&Si']&Si'f&Si'o&Si'|&Si!S&Si%{&Si`&Si&Q&Si~O!R#bOn$]a~O!O&ii!R&ii~P!)wO!R%zO!O'ji~O!R&`O!O'ti~O!O/uO~O!R!Va!S!Va~P#*XO]&ROk&RO!Q/{O'g(jO!R&jX!S&jX~P@dO!R+`O!S'ka~O]&ZOk&ZO!Q)yO'g'TO!R&oX!S&oX~O!R+cO!S'va~O!O'ui!R'ui~P!)wO_$^O!]!wO!d$ZO!j0VO!{0TO'W$^O'b$PO'p&oO~O!S0YO~P!?iO!X0ZO!Y0ZO'^$dO'g(jO'o+iO~O!W0[O~P#MSO!TSO!W0[O!u0^O!x0_O~P#MSO!W0[O!s0aO!t0aO!u0^O!x0_O~P#MSO!T&dO~O!T&dO~P!BpO!R'ri!c'ri_'ri'W'ri~P!)wO!{0jO!R'ri!c'ri_'ri'W'ri~O!R&tO!c'qi~Ox$uO!T$vO#V0lO']$bO~O#WraQraZra_rajra!ara!bra!dra!jra#[ra#]ra#^ra#_ra#`ra#ara#bra#cra#era#gra#ira#jra'Wra'fra'pra!cra!Ora!Tranra%Qra!]ra~P#7pO#W$^aQ$^aZ$^a_$^aj$^av$^a!a$^a!b$^a!d$^a!j$^a#[$^a#]$^a#^$^a#_$^a#`$^a#a$^a#b$^a#c$^a#e$^a#g$^a#i$^a#j$^a'W$^a'f$^a'p$^a!c$^a!O$^a!T$^an$^a%Q$^a!]$^a~P#8fO#W$`aQ$`aZ$`a_$`aj$`av$`a!a$`a!b$`a!d$`a!j$`a#[$`a#]$`a#^$`a#_$`a#`$`a#a$`a#b$`a#c$`a#e$`a#g$`a#i$`a#j$`a'W$`a'f$`a'p$`a!c$`a!O$`a!T$`an$`a%Q$`a!]$`a~P#9XO#W$naQ$naZ$na_$naj$nav$na!R$na!a$na!b$na!d$na!j$na#[$na#]$na#^$na#_$na#`$na#a$na#b$na#c$na#e$na#g$na#i$na#j$na'W$na'f$na'p$na!c$na!O$na!T$na!{$nan$na%Q$na!]$na~P!BpO_#Oq!R#Oq'W#Oq!O#Oq!c#Oqn#Oq!T#Oq%Q#Oq!]#Oq~P!)wO!R&kX'a&kX~PJjO!R,_O'a'ma~O!Q0tO!R&lX!c&lX~P){O!R,bO!c'na~O!R,bO!c'na~P!)wO#m!fa!S!fa~PCfO#m!^a!R!^a!S!^a~P#*XO!T1XO#x^O$P1YO~O!S1^O~On1_O~P!BpO_$Yq!R$Yq'W$Yq!O$Yq!c$Yqn$Yq!T$Yq%Q$Yq!]$Yq~P!)wO!O1`O~O],yOk,yO~Ou(SOx(TO'x(XOP$xi'w$xi!R$xi!{$xi~O'a$xi#m$xi~P$.POu(SOx(TOP$zi'w$zi'x$zi!R$zi!{$zi~O'a$zi#m$zi~P$.rO'p#[O~P!BpO!Q1cO']$bO!R&tX!c&tX~O!R-RO!c'}a~O!R-RO!]!wO!c'}a~O!R-RO!]!wO'p&oO!c'}a~O'a$gi!R$gi!{$gi#m$gi~P!#{O!Q1kO'](eO!O&vX!R&vX~P!$jO!R-ZO!O(Oa~O!R-ZO!O(Oa~P!BpO!]!wO~O!]!wO#c1sO~Oj1vO!]!wO'p&oO~O!R'di'a'di~P!#{O!{1yO!R'di'a'di~P!#{O!c1|O~O_$Zq!R$Zq'W$Zq!O$Zq!c$Zqn$Zq!T$Zq%Q$Zq!]$Zq~P!)wO!R2QO!T(PX~P!BpO!T&dO%Q2TO~O!T&dO%Q2TO~P!BpO!T$eX$u[X_$eX!R$eX'W$eX~P!!rO$u2XOPgXugXxgX!TgX'wgX'xgX_gX!RgX'WgX~O$u2XO~O]2_O%R2`O'])iO!R'PX!S'PX~O!R.^O!S(Va~OZ2dO~O^2eO~O]2hO~OP2jO!T&dO!o2iO%Q2TO~O_$^O'W$^O~P!BpO!T#zO~P!BpO!R2oO!{2qO!S(SX~O!S2rO~Ox;oO!W2{O!X2tO!Y2tO!r2zO!s2yO!t2yO!x2xO'^$dO'g(jO'o+iO~O!S2wO~P$7ZOP3SO!T.yO!o3RO%Q3QO~OP3SO!T.yO!o3RO%Q3QO'b$PO~O'](|O!R'OX!S'OX~O!R/VO!S(Ta~O]3^O'g3]O~O]3_O~O^3aO~O!c3dO~P){O_3fO~O_3fO~P){O#c3hO%r3iO~PFOO`/mO!S3mO&Q/lO~P`O!]3oO~O!R#Ti!S#Ti~P#*XO!{3qO!R#Ti!S#Ti~O!R!Vi!S!Vi~P#*XO_$^O!{3xO'W$^O~O_$^O!]!wO!{3xO'W$^O~O!X3|O!Y3|O'^$dO'g(jO'o+iO~O_$^O!]!wO!d$ZO!j3}O!{3xO'W$^O'b$PO'p&oO~O!W4OO~P$;xO!W4OO!u4RO!x4SO~P$;xO_$^O!]!wO!j3}O!{3xO'W$^O'p&oO~O!R'rq!c'rq_'rq'W'rq~P!)wO!R&tO!c'qq~O#W$xiQ$xiZ$xi_$xij$xiv$xi!a$xi!b$xi!d$xi!j$xi#[$xi#]$xi#^$xi#_$xi#`$xi#a$xi#b$xi#c$xi#e$xi#g$xi#i$xi#j$xi'W$xi'f$xi'p$xi!c$xi!O$xi!T$xin$xi%Q$xi!]$xi~P$.PO#W$ziQ$ziZ$zi_$zij$ziv$zi!a$zi!b$zi!d$zi!j$zi#[$zi#]$zi#^$zi#_$zi#`$zi#a$zi#b$zi#c$zi#e$zi#g$zi#i$zi#j$zi'W$zi'f$zi'p$zi!c$zi!O$zi!T$zin$zi%Q$zi!]$zi~P$.rO#W$giQ$giZ$gi_$gij$giv$gi!R$gi!a$gi!b$gi!d$gi!j$gi#[$gi#]$gi#^$gi#_$gi#`$gi#a$gi#b$gi#c$gi#e$gi#g$gi#i$gi#j$gi'W$gi'f$gi'p$gi!c$gi!O$gi!T$gi!{$gin$gi%Q$gi!]$gi~P!BpO!R&ka'a&ka~P!#{O!R&la!c&la~P!)wO!R,bO!c'ni~O#m#Oi!R#Oi!S#Oi~P#*XOQ#^Ou!{Ov!{Ox!|O!b!yO!d!zO!j#^O'fQOZ#Zij#Zi!a#Zi#]#Zi#^#Zi#_#Zi#`#Zi#a#Zi#b#Zi#c#Zi#e#Zi#g#Zi#i#Zi#j#Zi#m#Zi'p#Zi'w#Zi'x#Zi!R#Zi!S#Zi~O#[#Zi~P$EiO#[9eO~P$EiOQ#^Ou!{Ov!{Ox!|O!b!yO!d!zO!j#^O#[9eO#]9fO#^9fO#_9fO'fQOZ#Zi!a#Zi#`#Zi#a#Zi#b#Zi#c#Zi#e#Zi#g#Zi#i#Zi#j#Zi#m#Zi'p#Zi'w#Zi'x#Zi!R#Zi!S#Zi~Oj#Zi~P$GqOj9gO~P$GqOQ#^Oj9gOu!{Ov!{Ox!|O!b!yO!d!zO!j#^O#[9eO#]9fO#^9fO#_9fO#`9hO'fQO#e#Zi#g#Zi#i#Zi#j#Zi#m#Zi'p#Zi'w#Zi'x#Zi!R#Zi!S#Zi~OZ#Zi!a#Zi#a#Zi#b#Zi#c#Zi~P$IyOZ9rO!a9iO#a9iO#b9iO#c9iO~P$IyOQ#^OZ9rOj9gOu!{Ov!{Ox!|O!a9iO!b!yO!d!zO!j#^O#[9eO#]9fO#^9fO#_9fO#`9hO#a9iO#b9iO#c9iO#e9jO'fQO#g#Zi#i#Zi#j#Zi#m#Zi'p#Zi'x#Zi!R#Zi!S#Zi~O'w#Zi~P$L_O'w!}O~P$L_OQ#^OZ9rOj9gOu!{Ov!{Ox!|O!a9iO!b!yO!d!zO!j#^O#[9eO#]9fO#^9fO#_9fO#`9hO#a9iO#b9iO#c9iO#e9jO#g9lO'fQO'w!}O#i#Zi#j#Zi#m#Zi'p#Zi!R#Zi!S#Zi~O'x#Zi~P$NgO'x#OO~P$NgOQ#^OZ9rOj9gOu!{Ov!{Ox!|O!a9iO!b!yO!d!zO!j#^O#[9eO#]9fO#^9fO#_9fO#`9hO#a9iO#b9iO#c9iO#e9jO#g9lO#i9nO'fQO'w!}O'x#OO~O#j#Zi#m#Zi'p#Zi!R#Zi!S#Zi~P%!oO_#ky!R#ky'W#ky!O#ky!c#kyn#ky!T#ky%Q#ky!]#ky~P!)wOP;vOu(SOx(TO'w(VO'x(XO~OQ#ZiZ#Zij#Ziv#Zi!a#Zi!b#Zi!d#Zi!j#Zi#[#Zi#]#Zi#^#Zi#_#Zi#`#Zi#a#Zi#b#Zi#c#Zi#e#Zi#g#Zi#i#Zi#j#Zi#m#Zi'f#Zi'p#Zi!R#Zi!S#Zi~P%%aO!b!yOP'eXu'eXx'eX'w'eX'x'eX!S'eX~OQ'eXZ'eXj'eXv'eX!a'eX!d'eX!j'eX#['eX#]'eX#^'eX#_'eX#`'eX#a'eX#b'eX#c'eX#e'eX#g'eX#i'eX#j'eX#m'eX'f'eX'p'eX!R'eX~P%'eO#m#ni!R#ni!S#ni~P#*XO!S4eO~O!R&sa!S&sa~P#*XO!]!wO'p&oO!R&ta!c&ta~O!R-RO!c'}i~O!R-RO!]!wO!c'}i~O'a$gq!R$gq!{$gq#m$gq~P!#{O!O&va!R&va~P!BpO!]4lO~O!R-ZO!O(Oi~P!BpO!R-ZO!O(Oi~O!O4pO~O!]!wO#c4uO~Oj4vO!]!wO'p&oO~O!O4xO~O'a$iq!R$iq!{$iq#m$iq~P!#{O_$Zy!R$Zy'W$Zy!O$Zy!c$Zyn$Zy!T$Zy%Q$Zy!]$Zy~P!)wO!R2QO!T(Pa~O!T&dO%Q4}O~O!T&dO%Q4}O~P!BpO_#Oy!R#Oy'W#Oy!O#Oy!c#Oyn#Oy!T#Oy%Q#Oy!]#Oy~P!)wOZ5QO~O]5SO'])iO~O!R.^O!S(Vi~O]5VO~O^5WO~O'g'TO!R&{X!S&{X~O!R2oO!S(Sa~O!S5eO~P$7ZOx;sO'g(jO'o+iO~O!W5hO!X5gO!Y5gO!x0_O'^$dO'g(jO'o+iO~O!s5iO!t5iO~P%0^O!X5gO!Y5gO'^$dO'g(jO'o+iO~O!T.yO~O!T.yO%Q5kO~O!T.yO%Q5kO~P!BpOP5pO!T.yO!o5oO%Q5kO~OZ5uO!R'Oa!S'Oa~O!R/VO!S(Ti~O]5xO~O!c5yO~O!c5zO~O!c5{O~O!c5{O~P){O_5}O~O!]6QO~O!c6RO~O!R'ui!S'ui~P#*XO_$^O'W$^O~P!)wO_$^O!{6WO'W$^O~O_$^O!]!wO!{6WO'W$^O~O!X6]O!Y6]O'^$dO'g(jO'o+iO~O_$^O!]!wO!j6^O!{6WO'W$^O'p&oO~O!d$ZO'b$PO~P%4xO!W6_O~P%4gO!R'ry!c'ry_'ry'W'ry~P!)wO#W$gqQ$gqZ$gq_$gqj$gqv$gq!R$gq!a$gq!b$gq!d$gq!j$gq#[$gq#]$gq#^$gq#_$gq#`$gq#a$gq#b$gq#c$gq#e$gq#g$gq#i$gq#j$gq'W$gq'f$gq'p$gq!c$gq!O$gq!T$gq!{$gqn$gq%Q$gq!]$gq~P!BpO#W$iqQ$iqZ$iq_$iqj$iqv$iq!R$iq!a$iq!b$iq!d$iq!j$iq#[$iq#]$iq#^$iq#_$iq#`$iq#a$iq#b$iq#c$iq#e$iq#g$iq#i$iq#j$iq'W$iq'f$iq'p$iq!c$iq!O$iq!T$iq!{$iqn$iq%Q$iq!]$iq~P!BpO!R&li!c&li~P!)wO#m#Oq!R#Oq!S#Oq~P#*XOu-tOv-tOx-uOPra'wra'xra!Sra~OQraZrajra!ara!bra!dra!jra#[ra#]ra#^ra#_ra#`ra#ara#bra#cra#era#gra#ira#jra#mra'fra'pra!Rra~P%;OOu(SOx(TOP$^a'w$^a'x$^a!S$^a~OQ$^aZ$^aj$^av$^a!a$^a!b$^a!d$^a!j$^a#[$^a#]$^a#^$^a#_$^a#`$^a#a$^a#b$^a#c$^a#e$^a#g$^a#i$^a#j$^a#m$^a'f$^a'p$^a!R$^a~P%=SOu(SOx(TOP$`a'w$`a'x$`a!S$`a~OQ$`aZ$`aj$`av$`a!a$`a!b$`a!d$`a!j$`a#[$`a#]$`a#^$`a#_$`a#`$`a#a$`a#b$`a#c$`a#e$`a#g$`a#i$`a#j$`a#m$`a'f$`a'p$`a!R$`a~P%?WOQ$naZ$naj$nav$na!a$na!b$na!d$na!j$na#[$na#]$na#^$na#_$na#`$na#a$na#b$na#c$na#e$na#g$na#i$na#j$na#m$na'f$na'p$na!R$na!S$na~P%%aO#m$Yq!R$Yq!S$Yq~P#*XO#m$Zq!R$Zq!S$Zq~P#*XO!S6hO~O#m6iO~P!#{O!]!wO!R&ti!c&ti~O!]!wO'p&oO!R&ti!c&ti~O!R-RO!c'}q~O!O&vi!R&vi~P!BpO!R-ZO!O(Oq~O!O6oO~P!BpO!O6oO~O!R'dy'a'dy~P!#{O!R&ya!T&ya~P!BpO!T$tq_$tq!R$tq'W$tq~P!BpOZ6vO~O!R.^O!S(Vq~O]6yO~O!T&dO%Q6zO~O!T&dO%Q6zO~P!BpO!{6{O!R&{a!S&{a~O!R2oO!S(Si~P#*XO!X7RO!Y7RO'^$dO'g(jO'o+iO~O!W7TO!x4SO~P%GXO!T.yO%Q7WO~O!T.yO%Q7WO~P!BpO]7_O'g7^O~O!R/VO!S(Tq~O!c7aO~O!c7aO~P){O!c7cO~O!c7dO~O!R#Ty!S#Ty~P#*XO_$^O!{7jO'W$^O~O_$^O!]!wO!{7jO'W$^O~O!X7mO!Y7mO'^$dO'g(jO'o+iO~O_$^O!]!wO!j7nO!{7jO'W$^O'p&oO~O#m#ky!R#ky!S#ky~P#*XOQ$giZ$gij$giv$gi!a$gi!b$gi!d$gi!j$gi#[$gi#]$gi#^$gi#_$gi#`$gi#a$gi#b$gi#c$gi#e$gi#g$gi#i$gi#j$gi#m$gi'f$gi'p$gi!R$gi!S$gi~P%%aOu(SOx(TO'x(XOP$xi'w$xi!S$xi~OQ$xiZ$xij$xiv$xi!a$xi!b$xi!d$xi!j$xi#[$xi#]$xi#^$xi#_$xi#`$xi#a$xi#b$xi#c$xi#e$xi#g$xi#i$xi#j$xi#m$xi'f$xi'p$xi!R$xi~P%LjOu(SOx(TOP$zi'w$zi'x$zi!S$zi~OQ$ziZ$zij$ziv$zi!a$zi!b$zi!d$zi!j$zi#[$zi#]$zi#^$zi#_$zi#`$zi#a$zi#b$zi#c$zi#e$zi#g$zi#i$zi#j$zi#m$zi'f$zi'p$zi!R$zi~P%NnO#m$Zy!R$Zy!S$Zy~P#*XO#m#Oy!R#Oy!S#Oy~P#*XO!]!wO!R&tq!c&tq~O!R-RO!c'}y~O!O&vq!R&vq~P!BpO!O7tO~P!BpO!R.^O!S(Vy~O!R2oO!S(Sq~O!X8QO!Y8QO'^$dO'g(jO'o+iO~O!T.yO%Q8TO~O!T.yO%Q8TO~P!BpO!c8WO~O_$^O!{8]O'W$^O~O_$^O!]!wO!{8]O'W$^O~OQ$gqZ$gqj$gqv$gq!a$gq!b$gq!d$gq!j$gq#[$gq#]$gq#^$gq#_$gq#`$gq#a$gq#b$gq#c$gq#e$gq#g$gq#i$gq#j$gq#m$gq'f$gq'p$gq!R$gq!S$gq~P%%aOQ$iqZ$iqj$iqv$iq!a$iq!b$iq!d$iq!j$iq#[$iq#]$iq#^$iq#_$iq#`$iq#a$iq#b$iq#c$iq#e$iq#g$iq#i$iq#j$iq#m$iq'f$iq'p$iq!R$iq!S$iq~P%%aO'a$|!Z!R$|!Z!{$|!Z#m$|!Z~P!#{O!R&{q!S&{q~P#*XO_$^O!{8oO'W$^O~O#W$|!ZQ$|!ZZ$|!Z_$|!Zj$|!Zv$|!Z!R$|!Z!a$|!Z!b$|!Z!d$|!Z!j$|!Z#[$|!Z#]$|!Z#^$|!Z#_$|!Z#`$|!Z#a$|!Z#b$|!Z#c$|!Z#e$|!Z#g$|!Z#i$|!Z#j$|!Z'W$|!Z'f$|!Z'p$|!Z!c$|!Z!O$|!Z!T$|!Z!{$|!Zn$|!Z%Q$|!Z!]$|!Z~P!BpOP;uOu(SOx(TO'w(VO'x(XO~O!S!za!W!za!X!za!Y!za!r!za!s!za!t!za!x!za'^!za'g!za'o!za~P&,_O!W'eX!X'eX!Y'eX!r'eX!s'eX!t'eX!x'eX'^'eX'g'eX'o'eX~P%'eOQ$|!ZZ$|!Zj$|!Zv$|!Z!a$|!Z!b$|!Z!d$|!Z!j$|!Z#[$|!Z#]$|!Z#^$|!Z#_$|!Z#`$|!Z#a$|!Z#b$|!Z#c$|!Z#e$|!Z#g$|!Z#i$|!Z#j$|!Z#m$|!Z'f$|!Z'p$|!Z!R$|!Z!S$|!Z~P%%aO!Wra!Xra!Yra!rra!sra!tra!xra'^ra'gra'ora~P%;OO!W$^a!X$^a!Y$^a!r$^a!s$^a!t$^a!x$^a'^$^a'g$^a'o$^a~P%=SO!W$`a!X$`a!Y$`a!r$`a!s$`a!t$`a!x$`a'^$`a'g$`a'o$`a~P%?WO!S$na!W$na!X$na!Y$na!r$na!s$na!t$na!x$na'^$na'g$na'o$na~P&,_O!W$xi!X$xi!Y$xi!r$xi!s$xi!t$xi!x$xi'^$xi'g$xi'o$xi~P%LjO!W$zi!X$zi!Y$zi!r$zi!s$zi!t$zi!x$zi'^$zi'g$zi'o$zi~P%NnO!S$gi!W$gi!X$gi!Y$gi!r$gi!s$gi!t$gi!x$gi'^$gi'g$gi'o$gi~P&,_O!S$gq!W$gq!X$gq!Y$gq!r$gq!s$gq!t$gq!x$gq'^$gq'g$gq'o$gq~P&,_O!S$iq!W$iq!X$iq!Y$iq!r$iq!s$iq!t$iq!x$iq'^$iq'g$iq'o$iq~P&,_O!S$|!Z!W$|!Z!X$|!Z!Y$|!Z!r$|!Z!s$|!Z!t$|!Z!x$|!Z'^$|!Z'g$|!Z'o$|!Z~P&,_On'hX~P.jOn[X!O[X!c[X%r[X!T[X%Q[X!][X~P$zO!]dX!c[X!cdX'pdX~P;dOQ9^OR9^O]cOb;`Oc!jOhcOj9^OkcOlcOq9^Os9^OxRO{cO|cO}cO!TSO!_9`O!dUO!g9^O!h9^O!i9^O!j9^O!k9^O!n!iO#t!lO#x^O']'cO'fQO'oYO'|;^O~O]#qOh$QOj#rOk#qOl#qOq$ROs9uOx#yO!T#zO!_;fO!d#vO#V:OO#t$VO$_9xO$a9{O$d$WO']&{O'b$PO'f#sO~O!R9pO!S$]a~O]#qOh$QOj#rOk#qOl#qOq$ROs9vOx#yO!T#zO!_;gO!d#vO#V:PO#t$VO$_9yO$a9|O$d$WO']&{O'b$PO'f#sO~O#d'jO~P&<WO!S[X!SdX~P;dO!]9dO~O#W9cO~O!]!wO#W9cO~O!{9sO~O#c9iO~O!{:QO!R'uX!S'uX~O!{9sO!R'sX!S'sX~O#W:RO~O'a:TO~P!#{O#W:[O~O#W:]O~O#W:^O~O!]!wO#W:_O~O!]!wO#W:RO~O#m:`O~P#*XO#W:aO~O#W:bO~O#W:cO~O#W:dO~O#W:eO~O#W:fO~O#W:gO~O#W:hO~O!O:iO~O#m:jO~P!#{O#m:kO~P!#{O#m:lO~P!#{O!O:mO~P!BpO!O:mO~O!O:nO~P!BpO!]!wO#c;lO~O!]!wO#c;nO~O#x~!b!r!t!u#U#V'|$_$a$d$u%P%Q%R%X%Z%^%_%a%c~UT#x'|#]}'Y'Z#z'Y']'g~",
+  goto: "#Kk(ZPPPPPPPP([P(lP*`PPPP-zPP.a3s7o8SP8SPPP8SP:U8SP8SP:YPP:`P:t?VPPPP?ZPPPP?ZA{PPPBRDdP?ZPFwPPPPHp?ZPPPPPJi?ZPPMjNgPPPPNk!!TP!!]!#^PNg?Z?Z!&n!)i!.[!.[!1kPPP!1r!4h?ZPPPPPPPPPP!7_P!8pPP?Z!9}P?ZP?Z?Z?Z?ZP?Z!;dPP!>]P!AQ!AY!A^!A^P!>YP!Ab!AbP!DVP!DZ?Z?Z!Da!GT8SP8SP8S8SP!HW8S8S!Jf8S!M_8S# g8S8S#!T#$c#$c#$g#$c#$oP#$cP8S#%k8S#'X8S8S-zPPP#(yPP#)c#)cP#)cP#)x#)cPP#*OP#)uP#)u#*b!!X#)u#+P#+V#+Y([#+]([P#+d#+d#+dP([P([P([P([PP([P#+j#+mP#+m([P#+qP#+tP([P([P([P([P([P([([#+z#,U#,[#,b#,p#,v#,|#-W#-^#-m#-s#.R#.X#._#.m#/S#0z#1Y#1`#1f#1l#1r#1|#2S#2Y#2d#2v#2|PPPPPPPP#3SPP#3v#7OPP#8f#8m#8uPP#>a#@t#Fp#Fs#Fv#GR#GUPP#GX#G]#Gz#Hq#Hu#IZPP#I_#Ie#IiP#Il#Ip#Is#Jc#Jy#KO#KR#KU#K[#K_#Kc#KgmhOSj}!n$]%c%f%g%i*o*t/g/jQ$imQ$ppQ%ZyS&V!b+`Q&k!jS(l#z(qQ)g$jQ)t$rQ*`%TQ+f&^S+k&d+mQ+}&lQ-k(sQ/U*aY0Z+o+p+q+r+sS2t.y2vU3|0[0^0aU5g2y2z2{S6]4O4RS7R5h5iQ7m6_R8Q7T$p[ORSTUjk}!S!W!]!`!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#b#e$]$n%[%_%c%e%f%g%i%m%x%z&S&_&f&p&}'R(R)V)^*k*o*t+T+x,P,b,h-u-z.S.].|/_/`/a/c/g/j/l0T0j0t2i3R3f3h3i3x5o5}6W7j8]8o!j'e#]#k&W'w+X+[,m/{1X2q3q6{9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;aQ(}$SQ)l$lQ*b%WQ*i%`Q,X9tQ.W)aQ.c)mQ/^*gQ2_.^Q3Z/VQ4^9vQ5S2`R8{9upeOSjy}!n$]%Y%c%f%g%i*o*t/g/jR*d%[&WVOSTjkn}!S!W!k!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#]#b#e#k$]$n%[%_%`%c%e%f%g%i%m%z&S&_&f&p&}'R'w(R)V)^*k*o*t+T+X+[+x,P,b,h,m-u-z.S.].|/_/`/a/c/g/j/l/{0T0j0t1X2i2q3R3f3h3i3q3x5o5}6W6{7j8]8o9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;`;a[!cRU!]!`%x&WQ$clQ$hmS$mp$rv$wrs!r!u$Z$u&`&t&w)x)y)z*m+Y+h,S,U/o0lQ%PwQ&h!iQ&j!jS(_#v(cS)f$i$jQ)j$lQ)w$tQ*Z%RQ*_%TS+|&k&lQ-V(`Q.[)gQ.b)mQ.d)nQ.g)rQ/P*[S/T*`*aQ0h+}Q1b-RQ2^.^Q2b.aQ2g.iQ3Y/UQ4i1cQ5R2`Q5U2dQ6u5QR7w6vx#xa!y$T$U$Y(W(Y(b(w(x,_-Y-w1a1y6i;^;i;j;k!Y$fm!j$h$i$j&U&j&k&l(k)f)g+]+j+|+}-d.[0Q0W0]0h1u3{4Q6Z7k8^Q)`$cQ*P$|Q*S$}Q*^%TQ.k)wQ/O*ZU/S*_*`*aQ3T/PS3X/T/UQ5b2sQ5t3YS7P5c5fS8O7Q7SQ8f8PQ8u8g#[;b!w#d#v#y&g'}(Z(h)])_)a*O*R+y-Z-].R.T.p.s.{.}1k1s2Q2T2X2j3Q3S4l4u4}5k5p6z7W8T9w9z9}:U:X:[:a:d:j;l;n;t;u;vd;c9d9x9{:O:V:Y:]:b:e:ke;d9r9y9|:P:W:Z:^:c:f:lW#}a$P(y;^S$|t%YQ$}uQ%OvR)}$z%P#|a!w!y#d#v#y$T$U$Y&g'}(W(Y(Z(b(h(w(x)])_)a*O*R+y,_-Y-Z-]-w.R.T.p.s.{.}1a1k1s1y2Q2T2X2j3Q3S4l4u4}5k5p6i6z7W8T9d9r9w9x9y9z9{9|9}:O:P:U:V:W:X:Y:Z:[:]:^:a:b:c:d:e:f:j:k:l;^;i;j;k;l;n;t;u;vT(O#s(PX)O$S9t9u9vU&Z!b$v+cQ'U!{Q)q$oQ.t*TQ1z-tR5^2o&^cORSTUjk}!S!W!]!`!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#]#b#e#k$]$n%[%_%`%c%e%f%g%i%m%x%z&S&W&_&f&p&}'R'w(R)V)^*k*o*t+T+X+[+x,P,b,h,m-u-z.S.].|/_/`/a/c/g/j/l/{0T0j0t1X2i2q3R3f3h3i3q3x5o5}6W6{7j8]8o9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;a$]#aZ!_!o$a%w%}&y'Q'W'X'Y'Z'[']'^'_'`'a'b'd'g'k'u)p+R+^+g,O,^,d,g,i,w-x/v/y0i0s0w0x0y0z0{0|0}1O1P1Q1R1S1T1W1]2O2[3s3v4W4[4]4b4c5`6S6V6b6f6g7g7z8Z8m8y9_:|T!XQ!Y&_cORSTUjk}!S!W!]!`!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#]#b#e#k$]$n%[%_%`%c%e%f%g%i%m%x%z&S&W&_&f&p&}'R'w(R)V)^*k*o*t+T+X+[+x,P,b,h,m-u-z.S.].|/_/`/a/c/g/j/l/{0T0j0t1X2i2q3R3f3h3i3q3x5o5}6W6{7j8]8o9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;aQ&X!bR/|+`Y&R!b&V&^+`+fS(k#z(qS+j&d+mS-d(l(sQ-e(mQ-l(tQ.v*VU0W+k+o+pU0]+q+r+sS0b+t2xQ1u-kQ1w-mQ1x-nS2s.y2vU3{0Z0[0^Q4P0_Q4Q0aS5c2t2{S5f2y2zU6Z3|4O4RQ6`4SS7Q5g5hQ7S5iS7k6]6_S8P7R7TQ8^7mQ8g8QQ;h;oR;m;slhOSj}!n$]%c%f%g%i*o*t/g/jQ%k!QS&x!v9cQ)d$gQ*X%PQ*Y%QQ+z&iS,]&}:RS-y)V:_Q.Y)eQ.x*WQ/n*vQ/p*wQ/x+ZQ0`+qQ0f+{S2P-z:gQ2Y.ZS2].]:hQ3r/zQ3u0RQ4U0gQ5P2ZQ6T3tQ6X3zQ6a4VQ7e6RQ7h6YQ8Y7iQ8l8[R8x8n$W#`Z!_!o%w%}&y'Q'W'X'Y'Z'[']'^'_'`'a'b'd'g'k'u)p+R+^+g,O,^,d,g,w-x/v/y0i0s0w0x0y0z0{0|0}1O1P1Q1R1S1T1W1]2O2[3s3v4W4[4]4b4c5`6S6V6b6f6g7g7z8Z8m8y9_:|W(v#{&|1V8qT)Z$a,i$W#_Z!_!o%w%}&y'Q'W'X'Y'Z'[']'^'_'`'a'b'd'g'k'u)p+R+^+g,O,^,d,g,w-x/v/y0i0s0w0x0y0z0{0|0}1O1P1Q1R1S1T1W1]2O2[3s3v4W4[4]4b4c5`6S6V6b6f6g7g7z8Z8m8y9_:|Q'f#`S)Y$a,iR-{)Z&^cORSTUjk}!S!W!]!`!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#]#b#e#k$]$n%[%_%`%c%e%f%g%i%m%x%z&S&W&_&f&p&}'R'w(R)V)^*k*o*t+T+X+[+x,P,b,h,m-u-z.S.].|/_/`/a/c/g/j/l/{0T0j0t1X2i2q3R3f3h3i3q3x5o5}6W6{7j8]8o9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;aQ%f{Q%g|Q%i!OQ%j!PR/f*rQ&e!iQ)[$cQ+w&hS.Q)`)wS0c+u+vW2S-}.O.P.kS4T0d0eU4|2U2V2WU6s4{5Y5ZQ7v6tR8b7yT+l&d+mS+j&d+mU0W+k+o+pU0]+q+r+sS0b+t2xS2s.y2vU3{0Z0[0^Q4P0_Q4Q0aS5c2t2{S5f2y2zU6Z3|4O4RQ6`4SS7Q5g5hQ7S5iS7k6]6_S8P7R7TQ8^7mR8g8QS+l&d+mT2u.y2vS&r!q/dQ-U(_Q-b(kS0V+j2sQ1g-VS1p-c-lU3}0]0b5fQ4h1bS4s1v1xU6^4P4Q7SQ6k4iQ6r4vR7n6`Q!xXS&q!q/dQ)W$[Q)b$eQ)h$kQ,Q&rQ-T(_Q-a(kQ-f(nQ.X)cQ/Q*]S0U+j2sS1f-U-VS1o-b-lQ1r-eQ1t-gQ3V/RW3y0V0]0b5fQ4g1bQ4k1gS4o1p1xQ4t1wQ5r3WW6[3}4P4Q7SS6j4h4iS6n4p:iQ6p4sQ6}5aQ7[5sS7l6^6`Q7r6kS7s6o:mQ7u6rQ7|7OQ8V7]Q8_7nS8a7t:nQ8d7}Q8s8eQ9Q8tQ9X9RQ:u:pQ;T:zQ;U:{Q;V;hR;[;m$rWORSTUjk}!S!W!]!`!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#b#e$]$n%[%_%`%c%e%f%g%i%m%x%z&S&_&f&p&}'R(R)V)^*k*o*t+T+x,P,b,h-u-z.S.].|/_/`/a/c/g/j/l0T0j0t2i3R3f3h3i3x5o5}6W7j8]8oS!xn!k!j:o#]#k&W'w+X+[,m/{1X2q3q6{9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;aR:u;`$rXORSTUjk}!S!W!]!`!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#b#e$]$n%[%_%`%c%e%f%g%i%m%x%z&S&_&f&p&}'R(R)V)^*k*o*t+T+x,P,b,h-u-z.S.].|/_/`/a/c/g/j/l0T0j0t2i3R3f3h3i3x5o5}6W7j8]8oQ$[b!Y$em!j$h$i$j&U&j&k&l(k)f)g+]+j+|+}-d.[0Q0W0]0h1u3{4Q6Z7k8^S$kn!kQ)c$fQ*]%TW/R*^*_*`*aU3W/S/T/UQ5a2sS5s3X3YU7O5b5c5fQ7]5tU7}7P7Q7SS8e8O8PS8t8f8gQ9R8u!j:p#]#k&W'w+X+[,m/{1X2q3q6{9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;aQ:z;_R:{;`$f]OSTjk}!S!W!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#b#e$]$n%[%_%c%e%f%g%i%m%z&S&_&f&p&}'R(R)V)^*k*o*t+T+x,P,b,h-u-z.S.].|/_/`/a/c/g/j/l0T0j0t2i3R3f3h3i3x5o5}6W7j8]8oY!hRU!]!`%xv$wrs!r!u$Z$u&`&t&w)x)y)z*m+Y+h,S,U/o0lQ*j%`!h:q#]#k'w+X+[,m/{1X2q3q6{9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;aR:t&WS&[!b$vR0O+c$p[ORSTUjk}!S!W!]!`!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#b#e$]$n%[%_%c%e%f%g%i%m%x%z&S&_&f&p&}'R(R)V)^*k*o*t+T+x,P,b,h-u-z.S.].|/_/`/a/c/g/j/l0T0j0t2i3R3f3h3i3x5o5}6W7j8]8o!j'e#]#k&W'w+X+[,m/{1X2q3q6{9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;aR*i%`$roORSTUjk}!S!W!]!`!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#b#e$]$n%[%_%`%c%e%f%g%i%m%x%z&S&_&f&p&}'R(R)V)^*k*o*t+T+x,P,b,h-u-z.S.].|/_/`/a/c/g/j/l0T0j0t2i3R3f3h3i3x5o5}6W7j8]8oQ'U!{!k:r#]#k&W'w+X+[,m/{1X2q3q6{9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;a!h#VZ!_$a%w%}&y'Q'_'`'a'b'g'k)p+R+g,O,^,d,w-x0i0s1T2O2[3v4W4[6V7g8Z8m8y9_!R9k'd'u+^,i/v/y0w1P1Q1R1S1W1]3s4]4b4c5`6S6b6f6g7z:|!d#XZ!_$a%w%}&y'Q'a'b'g'k)p+R+g,O,^,d,w-x0i0s1T2O2[3v4W4[6V7g8Z8m8y9_}9m'd'u+^,i/v/y0w1R1S1W1]3s4]4b4c5`6S6b6f6g7z:|!`#]Z!_$a%w%}&y'Q'g'k)p+R+g,O,^,d,w-x0i0s1T2O2[3v4W4[6V7g8Z8m8y9_Q1a-Px;a'd'u+^,i/v/y0w1W1]3s4]4b4c5`6S6b6f6g7z:|Q;i;pQ;j;qR;k;r&^cORSTUjk}!S!W!]!`!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#]#b#e#k$]$n%[%_%`%c%e%f%g%i%m%x%z&S&W&_&f&p&}'R'w(R)V)^*k*o*t+T+X+[+x,P,b,h,m-u-z.S.].|/_/`/a/c/g/j/l/{0T0j0t1X2i2q3R3f3h3i3q3x5o5}6W6{7j8]8o9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;aS#l`#mR1Y,l&e_ORSTU`jk}!S!W!]!`!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#]#b#e#k#m$]$n%[%_%`%c%e%f%g%i%m%x%z&S&W&_&f&p&}'R'w(R)V)^*k*o*t+T+X+[+x,P,b,h,l,m-u-z.S.].|/_/`/a/c/g/j/l/{0T0j0t1X2i2q3R3f3h3i3q3x5o5}6W6{7j8]8o9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;aS#g^#nT'n#i'rT#h^#nT'p#i'r&e`ORSTU`jk}!S!W!]!`!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#]#b#e#k#m$]$n%[%_%`%c%e%f%g%i%m%x%z&S&W&_&f&p&}'R'w(R)V)^*k*o*t+T+X+[+x,P,b,h,l,m-u-z.S.].|/_/`/a/c/g/j/l/{0T0j0t1X2i2q3R3f3h3i3q3x5o5}6W6{7j8]8o9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;aT#l`#mQ#o`R'y#m$rbORSTUjk}!S!W!]!`!n!v!z!|#P#Q#R#S#T#U#V#W#X#Y#Z#b#e$]$n%[%_%`%c%e%f%g%i%m%x%z&S&_&f&p&}'R(R)V)^*k*o*t+T+x,P,b,h-u-z.S.].|/_/`/a/c/g/j/l0T0j0t2i3R3f3h3i3x5o5}6W7j8]8o!k;_#]#k&W'w+X+[,m/{1X2q3q6{9^9`9c9e9f9g9h9i9j9k9l9m9n9o9p9s:Q:R:T:_:`:g:h;a#RdOSUj}!S!W!n!|#k$]%[%_%`%c%e%f%g%i%m&S&f'w)^*k*o*t+x,m-u.S.|/_/`/a/c/g/j/l1X2i3R3f3h3i5o5}x#{a!y$T$U$Y(W(Y(b(w(x,_-Y-w1a1y6i;^;i;j;k#[&|!w#d#v#y&g'}(Z(h)])_)a*O*R+y-Z-].R.T.p.s.{.}1k1s2Q2T2X2j3Q3S4l4u4}5k5p6z7W8T9w9z9}:U:X:[:a:d:j;l;n;t;u;vQ)S$WQ,x(Sd1V9r9y9|:P:W:Z:^:c:f:le8q9d9x9{:O:V:Y:]:b:e:kx#wa!y$T$U$Y(W(Y(b(w(x,_-Y-w1a1y6i;^;i;j;kQ(d#xS(n#z(qQ)T$XQ-g(o#[:w!w#d#v#y&g'}(Z(h)])_)a*O*R+y-Z-].R.T.p.s.{.}1k1s2Q2T2X2j3Q3S4l4u4}5k5p6z7W8T9w9z9}:U:X:[:a:d:j;l;n;t;u;vd:x9d9x9{:O:V:Y:]:b:e:kd:y9r9y9|:P:W:Z:^:c:f:lQ:};bQ;O;cQ;P;dQ;Q;eQ;R;fR;S;gx#{a!y$T$U$Y(W(Y(b(w(x,_-Y-w1a1y6i;^;i;j;k#[&|!w#d#v#y&g'}(Z(h)])_)a*O*R+y-Z-].R.T.p.s.{.}1k1s2Q2T2X2j3Q3S4l4u4}5k5p6z7W8T9w9z9}:U:X:[:a:d:j;l;n;t;u;vd1V9r9y9|:P:W:Z:^:c:f:le8q9d9x9{:O:V:Y:]:b:e:klfOSj}!n$]%c%f%g%i*o*t/g/jQ(g#yQ*}%pQ+O%rR1j-Z%O#|a!w!y#d#v#y$T$U$Y&g'}(W(Y(Z(b(h(w(x)])_)a*O*R+y,_-Y-Z-]-w.R.T.p.s.{.}1a1k1s1y2Q2T2X2j3Q3S4l4u4}5k5p6i6z7W8T9d9r9w9x9y9z9{9|9}:O:P:U:V:W:X:Y:Z:[:]:^:a:b:c:d:e:f:j:k:l;^;i;j;k;l;n;t;u;vQ*Q$}Q.r*SQ2m.qR5]2nT(p#z(qS(p#z(qT2u.y2vQ)b$eQ-f(nQ.X)cQ/Q*]Q3V/RQ5r3WQ6}5aQ7[5sQ7|7OQ8V7]Q8d7}Q8s8eQ9Q8tR9X9Rp(W#t'O)U-X-o-p0q1h1}4f4w7q:v;W;X;Y!n:U&z'i(^(f+v,[,t-P-^-|.P.o.q0e0p1i1m2W2l2n3O4Y4Z4m4q4y5O5Z5n6m6q7Y8`;Z;];p;q;r[:V8p9O9V9Y9Z9]]:W1U4a6c7o7p8zr(Y#t'O)U,}-X-o-p0q1h1}4f4w7q:v;W;X;Y!p:X&z'i(^(f+v,[,t-P-^-|.P.o.q0e0n0p1i1m2W2l2n3O4Y4Z4m4q4y5O5Z5n6m6q7Y8`;Z;];p;q;r^:Y8p9O9T9V9Y9Z9]_:Z1U4a6c6d7o7p8zpeOSjy}!n$]%Y%c%f%g%i*o*t/g/jQ%VxR*k%`peOSjy}!n$]%Y%c%f%g%i*o*t/g/jR%VxQ*U%OR.n)}qeOSjy}!n$]%Y%c%f%g%i*o*t/g/jQ.z*ZS3P/O/PW5j2|2}3O3TU7V5l5m5nU8R7U7X7YQ8h8SR8v8iQ%^yR*e%YR3^/XR7_5uS$mp$rR.d)nQ%czR*o%dR*u%jT/h*t/jR*y%kQ*x%kR/q*yQjOQ!nST$`j!nQ(P#sR,u(PQ!YQR%u!YQ!^RU%{!^%|+UQ%|!_R+U%}Q+a&XR/}+aQ,`'OR0r,`Q,c'QS0u,c0vR0v,dQ+m&dR0X+mS!eR$uU&a!e&b+VQ&b!fR+V&OQ+d&[R0P+dQ&u!sQ,R&sU,V&u,R0mR0m,WQ'r#iR,n'rQ#m`R'x#mQ#cZU'h#c+Q9qQ+Q9_R9q'uQ-S(_W1d-S1e4j6lU1e-T-U-VS4j1f1gR6l4k$k(U#t&z'O'i(^(f)P)Q)U+v,Y,Z,[,t,}-O-P-X-^-o-p-|.P.o.q0e0n0o0p0q1U1h1i1m1}2W2l2n3O4Y4Z4_4`4a4f4m4q4w4y5O5Z5n6c6d6e6m6q7Y7o7p7q8`8p8z8|8}9O9T9U9V9Y9Z9]:v;W;X;Y;Z;];p;q;rQ-[(fU1l-[1n4nQ1n-^R4n1mQ(q#zR-i(qQ(z$OR-r(zQ2R-|R4z2RQ){$xR.m){Q2p.tS5_2p6|R6|5`Q*W%PR.w*WQ2v.yR5d2vQ/W*bS3[/W5vR5v3^Q._)jW2a._2c5T6wQ2c.bQ5T2bR6w5UQ)o$mR.e)oQ/j*tR3l/jWiOSj!nQ%h}Q)X$]Q*n%cQ*p%fQ*q%gQ*s%iQ/e*oS/h*t/jR3k/gQ$_gQ%l!RQ%o!TQ%q!UQ%s!VQ)v$sQ)|$yQ*d%^Q*{%nQ-h(pS/Z*e*hQ/r*zQ/s*}Q/t+OS0S+j2sQ2f.hQ2k.oQ3U/QQ3`/]Q3j/fY3w0U0V0]0b5fQ5X2hQ5[2lQ5q3VQ5w3_[6U3v3y3}4P4Q7SQ6x5VQ7Z5rQ7`5xW7f6V6[6^6`Q7x6yQ7{6}Q8U7[U8X7g7l7nQ8c7|Q8j8VS8k8Z8_Q8r8dQ8w8mQ9P8sQ9S8yQ9W9QR9[9XQ$gmQ&i!jU)e$h$i$jQ+Z&UU+{&j&k&lQ-`(kS.Z)f)gQ/z+]Q0R+jS0g+|+}Q1q-dQ2Z.[Q3t0QS3z0W0]Q4V0hQ4r1uS6Y3{4QQ7i6ZQ8[7kR8n8^S#ua;^R({$PU$Oa$P;^R-q(yQ#taS&z!w)aQ'O!yQ'i#dQ(^#vQ(f#yQ)P$TQ)Q$UQ)U$YQ+v&gQ,Y9wQ,Z9zQ,[9}Q,t'}Q,}(WQ-O(YQ-P(ZQ-X(bQ-^(hQ-o(wQ-p(xd-|)].R.{2T3Q4}5k6z7W8TQ.P)_Q.o*OQ.q*RQ0e+yQ0n:UQ0o:XQ0p:[Q0q,_Q1U9rQ1h-YQ1i-ZQ1m-]Q1}-wQ2W.TQ2l.pQ2n.sQ3O.}Q4Y:aQ4Z:dQ4_9yQ4`9|Q4a:PQ4f1aQ4m1kQ4q1sQ4w1yQ4y2QQ5O2XQ5Z2jQ5n3SQ6c:^Q6d:WQ6e:ZQ6m4lQ6q4uQ7Y5pQ7o:cQ7p:fQ7q6iQ8`:jQ8p9dQ8z:lQ8|9xQ8}9{Q9O:OQ9T:VQ9U:YQ9V:]Q9Y:bQ9Z:eQ9]:kQ:v;^Q;W;iQ;X;jQ;Y;kQ;Z;lQ;];nQ;p;tQ;q;uR;r;vlgOSj}!n$]%c%f%g%i*o*t/g/jS!pU%eQ%n!SQ%t!WQ'V!|Q'v#kS*h%[%_Q*l%`Q*z%mQ+W&SQ+u&fQ,r'wQ.O)^Q/b*kQ0d+xQ1[,mQ1{-uQ2V.SQ2}.|Q3b/_Q3c/`Q3e/aQ3g/cQ3n/lQ4d1XQ5Y2iQ5m3RQ5|3fQ6O3hQ6P3iQ7X5oR7b5}!vZOSUj}!S!n!|$]%[%_%`%c%e%f%g%i%m&S&f)^*k*o*t+x-u.S.|/_/`/a/c/g/j/l2i3R3f3h3i5o5}Q!_RQ!oTQ$akS%w!]%zQ%}!`Q&y!vQ'Q!zQ'W#PQ'X#QQ'Y#RQ'Z#SQ'[#TQ']#UQ'^#VQ'_#WQ'`#XQ'a#YQ'b#ZQ'd#]Q'g#bQ'k#eW'u#k'w,m1XQ)p$nS+R%x+TS+^&W/{Q+g&_Q,O&pQ,^&}Q,d'RQ,g9^Q,i9`Q,w(RQ-x)VQ/v+XQ/y+[Q0i,PQ0s,bQ0w9cQ0x9eQ0y9fQ0z9gQ0{9hQ0|9iQ0}9jQ1O9kQ1P9lQ1Q9mQ1R9nQ1S9oQ1T,hQ1W9sQ1]9pQ2O-zQ2[.]Q3s:QQ3v0TQ4W0jQ4[0tQ4]:RQ4b:TQ4c:_Q5`2qQ6S3qQ6V3xQ6b:`Q6f:gQ6g:hQ7g6WQ7z6{Q8Z7jQ8m8]Q8y8oQ9_!WR:|;aR!aRR&Y!bS&U!b+`S+]&V&^R0Q+fR'P!yR'S!zT!tU$ZS!sU$ZU$xrs*mS&s!r!uQ,T&tQ,W&wQ.l)zS0k,S,UR4X0l`!dR!]!`$u%x&`)x+hh!qUrs!r!u$Z&t&w)z,S,U0lQ/d*mQ/w+YQ3p/oT:s&W)yT!gR$uS!fR$uS%y!]&`S&O!`)xS+S%x+hT+_&W)yT&]!b$vQ#i^R'{#nT'q#i'rR1Z,lT(a#v(cR(i#yQ-})]Q2U.RQ2|.{Q4{2TQ5l3QQ6t4}Q7U5kQ7y6zQ8S7WR8i8TlhOSj}!n$]%c%f%g%i*o*t/g/jQ%]yR*d%YV$yrs*mR.u*TR*c%WQ$qpR)u$rR)k$lT%az%dT%bz%dT/i*t/j",
+  nodeNames: "⚠ extends ArithOp ArithOp InterpolationStart LineComment BlockComment Script ExportDeclaration export Star as VariableName String from ; default FunctionDeclaration async function VariableDefinition TypeParamList TypeDefinition ThisType this LiteralType ArithOp Number BooleanLiteral TemplateType InterpolationEnd Interpolation VoidType void TypeofType typeof MemberExpression . ?. PropertyName [ TemplateString Interpolation null super RegExp ] ArrayExpression Spread , } { ObjectExpression Property async get set PropertyDefinition Block : NewExpression new TypeArgList CompareOp < ) ( ArgList UnaryExpression await yield delete LogicOp BitOp ParenthesizedExpression ClassExpression class extends ClassBody MethodDeclaration Privacy static abstract override PrivatePropertyDefinition PropertyDeclaration readonly Optional TypeAnnotation Equals StaticBlock FunctionExpression ArrowFunction ParamList ParamList ArrayPattern ObjectPattern PatternProperty Privacy readonly Arrow MemberExpression PrivatePropertyName BinaryExpression ArithOp ArithOp ArithOp ArithOp BitOp CompareOp instanceof in const CompareOp BitOp BitOp BitOp LogicOp LogicOp ConditionalExpression LogicOp LogicOp AssignmentExpression UpdateOp PostfixExpression CallExpression TaggedTemplateExpression DynamicImport import ImportMeta JSXElement JSXSelfCloseEndTag JSXStartTag JSXSelfClosingTag JSXIdentifier JSXNamespacedName JSXMemberExpression JSXSpreadAttribute JSXAttribute JSXAttributeValue JSXEscape JSXEndTag JSXOpenTag JSXFragmentTag JSXText JSXEscape JSXStartCloseTag JSXCloseTag PrefixCast ArrowFunction TypeParamList SequenceExpression KeyofType keyof UniqueType unique ImportType InferredType infer TypeName ParenthesizedType FunctionSignature ParamList NewSignature IndexedType TupleType Label ArrayType ReadonlyType ObjectType MethodType PropertyType IndexSignature CallSignature TypePredicate is NewSignature new UnionType LogicOp IntersectionType LogicOp ConditionalType ParameterizedType ClassDeclaration abstract implements type VariableDeclaration let var TypeAliasDeclaration InterfaceDeclaration interface EnumDeclaration enum EnumBody NamespaceDeclaration namespace module AmbientDeclaration declare GlobalDeclaration global ClassDeclaration ClassBody MethodDeclaration AmbientFunctionDeclaration ExportGroup VariableName VariableName ImportDeclaration ImportGroup ForStatement for ForSpec ForInSpec ForOfSpec of WhileStatement while WithStatement with DoStatement do IfStatement if else SwitchStatement switch SwitchBody CaseLabel case DefaultLabel TryStatement try CatchClause catch FinallyClause finally ReturnStatement return ThrowStatement throw BreakStatement break ContinueStatement continue DebuggerStatement debugger LabeledStatement ExpressionStatement",
+  maxTerm: 332,
+  context: trackNewline,
+  nodeProps: [
+    ["closedBy", 4,"InterpolationEnd",40,"]",51,"}",66,")",132,"JSXSelfCloseEndTag JSXEndTag",146,"JSXEndTag"],
+    ["group", -26,8,15,17,58,184,188,191,192,194,197,200,211,213,219,221,223,225,228,234,240,242,244,246,248,250,251,"Statement",-30,12,13,24,27,28,41,43,44,45,47,52,60,68,74,75,91,92,101,103,119,122,124,125,126,127,129,130,148,149,151,"Expression",-22,23,25,29,32,34,152,154,156,157,159,160,161,163,164,165,167,168,169,178,180,182,183,"Type",-3,79,85,90,"ClassItem"],
+    ["openedBy", 30,"InterpolationStart",46,"[",50,"{",65,"(",131,"JSXStartTag",141,"JSXStartTag JSXStartCloseTag"]
+  ],
+  propSources: [jsHighlight],
+  skippedNodes: [0,5,6],
+  repeatNodeCount: 28,
+  tokenData: "!C}~R!`OX%TXY%cYZ'RZ[%c[]%T]^'R^p%Tpq%cqr'crs(kst0htu2`uv4pvw5ewx6cxy<yyz=Zz{=k{|>k|}?O}!O>k!O!P?`!P!QCl!Q!R!0[!R![!1q![!]!7s!]!^!8V!^!_!8g!_!`!9d!`!a!:[!a!b!<R!b!c%T!c!}2`!}#O!=d#O#P%T#P#Q!=t#Q#R!>U#R#S2`#S#T!>i#T#o2`#o#p!>y#p#q!?O#q#r!?f#r#s!?x#s$f%T$f$g%c$g#BY2`#BY#BZ!@Y#BZ$IS2`$IS$I_!@Y$I_$I|2`$I|$I}!Bq$I}$JO!Bq$JO$JT2`$JT$JU!@Y$JU$KV2`$KV$KW!@Y$KW&FU2`&FU&FV!@Y&FV?HT2`?HT?HU!@Y?HU~2`W%YR$UWO!^%T!_#o%T#p~%T7Z%jg$UW'Y7ROX%TXY%cYZ%TZ[%c[p%Tpq%cq!^%T!_#o%T#p$f%T$f$g%c$g#BY%T#BY#BZ%c#BZ$IS%T$IS$I_%c$I_$JT%T$JT$JU%c$JU$KV%T$KV$KW%c$KW&FU%T&FU&FV%c&FV?HT%T?HT?HU%c?HU~%T7Z'YR$UW'Z7RO!^%T!_#o%T#p~%T$T'jS$UW!j#{O!^%T!_!`'v!`#o%T#p~%T$O'}S#e#v$UWO!^%T!_!`(Z!`#o%T#p~%T$O(bR#e#v$UWO!^%T!_#o%T#p~%T)X(rZ$UW]#eOY(kYZ)eZr(krs*rs!^(k!^!_+U!_#O(k#O#P-b#P#o(k#o#p+U#p~(k&r)jV$UWOr)ers*Ps!^)e!^!_*a!_#o)e#o#p*a#p~)e&r*WR$P&j$UWO!^%T!_#o%T#p~%T&j*dROr*ars*ms~*a&j*rO$P&j)X*{R$P&j$UW]#eO!^%T!_#o%T#p~%T)P+ZV]#eOY+UYZ*aZr+Urs+ps#O+U#O#P+w#P~+U)P+wO$P&j]#e)P+zROr+Urs,Ts~+U)P,[U$P&j]#eOY,nZr,nrs-Vs#O,n#O#P-[#P~,n#e,sU]#eOY,nZr,nrs-Vs#O,n#O#P-[#P~,n#e-[O]#e#e-_PO~,n)X-gV$UWOr(krs-|s!^(k!^!_+U!_#o(k#o#p+U#p~(k)X.VZ$P&j$UW]#eOY.xYZ%TZr.xrs/rs!^.x!^!_,n!_#O.x#O#P0S#P#o.x#o#p,n#p~.x#m/PZ$UW]#eOY.xYZ%TZr.xrs/rs!^.x!^!_,n!_#O.x#O#P0S#P#o.x#o#p,n#p~.x#m/yR$UW]#eO!^%T!_#o%T#p~%T#m0XT$UWO!^.x!^!_,n!_#o.x#o#p,n#p~.x3]0mZ$UWOt%Ttu1`u!^%T!_!c%T!c!}1`!}#R%T#R#S1`#S#T%T#T#o1`#p$g%T$g~1`3]1g]$UW'o3TOt%Ttu1`u!Q%T!Q![1`![!^%T!_!c%T!c!}1`!}#R%T#R#S1`#S#T%T#T#o1`#p$g%T$g~1`7Z2k_$UW#zS']$y'g3SOt%Ttu2`u}%T}!O3j!O!Q%T!Q![2`![!^%T!_!c%T!c!}2`!}#R%T#R#S2`#S#T%T#T#o2`#p$g%T$g~2`[3q_$UW#zSOt%Ttu3ju}%T}!O3j!O!Q%T!Q![3j![!^%T!_!c%T!c!}3j!}#R%T#R#S3j#S#T%T#T#o3j#p$g%T$g~3j$O4wS#^#v$UWO!^%T!_!`5T!`#o%T#p~%T$O5[R$UW#o#vO!^%T!_#o%T#p~%T5b5lU'x5Y$UWOv%Tvw6Ow!^%T!_!`5T!`#o%T#p~%T$O6VS$UW#i#vO!^%T!_!`5T!`#o%T#p~%T)X6jZ$UW]#eOY6cYZ7]Zw6cwx*rx!^6c!^!_8T!_#O6c#O#P:T#P#o6c#o#p8T#p~6c&r7bV$UWOw7]wx*Px!^7]!^!_7w!_#o7]#o#p7w#p~7]&j7zROw7wwx*mx~7w)P8YV]#eOY8TYZ7wZw8Twx+px#O8T#O#P8o#P~8T)P8rROw8Twx8{x~8T)P9SU$P&j]#eOY9fZw9fwx-Vx#O9f#O#P9}#P~9f#e9kU]#eOY9fZw9fwx-Vx#O9f#O#P9}#P~9f#e:QPO~9f)X:YV$UWOw6cwx:ox!^6c!^!_8T!_#o6c#o#p8T#p~6c)X:xZ$P&j$UW]#eOY;kYZ%TZw;kwx/rx!^;k!^!_9f!_#O;k#O#P<e#P#o;k#o#p9f#p~;k#m;rZ$UW]#eOY;kYZ%TZw;kwx/rx!^;k!^!_9f!_#O;k#O#P<e#P#o;k#o#p9f#p~;k#m<jT$UWO!^;k!^!_9f!_#o;k#o#p9f#p~;k&i=QR!d&a$UWO!^%T!_#o%T#p~%Tk=bR!cc$UWO!^%T!_#o%T#p~%T7V=tU'^4V#_#v$UWOz%Tz{>W{!^%T!_!`5T!`#o%T#p~%T$O>_S#[#v$UWO!^%T!_!`5T!`#o%T#p~%T%w>rSj%o$UWO!^%T!_!`5T!`#o%T#p~%T&i?VR!R&a$UWO!^%T!_#o%T#p~%T7Z?gVu5^$UWO!O%T!O!P?|!P!Q%T!Q![@r![!^%T!_#o%T#p~%T!{@RT$UWO!O%T!O!P@b!P!^%T!_#o%T#p~%T!{@iR!Q!s$UWO!^%T!_#o%T#p~%T!{@yZ$UWk!sO!Q%T!Q![@r![!^%T!_!g%T!g!hAl!h#R%T#R#S@r#S#X%T#X#YAl#Y#o%T#p~%T!{AqZ$UWO{%T{|Bd|}%T}!OBd!O!Q%T!Q![CO![!^%T!_#R%T#R#SCO#S#o%T#p~%T!{BiV$UWO!Q%T!Q![CO![!^%T!_#R%T#R#SCO#S#o%T#p~%T!{CVV$UWk!sO!Q%T!Q![CO![!^%T!_#R%T#R#SCO#S#o%T#p~%T7ZCs`$UW#]#vOYDuYZ%TZzDuz{Jl{!PDu!P!Q!-e!Q!^Du!^!_Fx!_!`!.^!`!a!/]!a!}Du!}#OHq#O#PJQ#P#oDu#o#pFx#p~DuXD|[$UW}POYDuYZ%TZ!PDu!P!QEr!Q!^Du!^!_Fx!_!}Du!}#OHq#O#PJQ#P#oDu#o#pFx#p~DuXEy_$UW}PO!^%T!_#Z%T#Z#[Er#[#]%T#]#^Er#^#a%T#a#bEr#b#g%T#g#hEr#h#i%T#i#jEr#j#m%T#m#nEr#n#o%T#p~%TPF}V}POYFxZ!PFx!P!QGd!Q!}Fx!}#OG{#O#PHh#P~FxPGiU}P#Z#[Gd#]#^Gd#a#bGd#g#hGd#i#jGd#m#nGdPHOTOYG{Z#OG{#O#PH_#P#QFx#Q~G{PHbQOYG{Z~G{PHkQOYFxZ~FxXHvY$UWOYHqYZ%TZ!^Hq!^!_G{!_#OHq#O#PIf#P#QDu#Q#oHq#o#pG{#p~HqXIkV$UWOYHqYZ%TZ!^Hq!^!_G{!_#oHq#o#pG{#p~HqXJVV$UWOYDuYZ%TZ!^Du!^!_Fx!_#oDu#o#pFx#p~Du7ZJs^$UW}POYJlYZKoZzJlz{NQ{!PJl!P!Q!,R!Q!^Jl!^!_!!]!_!}Jl!}#O!'|#O#P!+a#P#oJl#o#p!!]#p~Jl7ZKtV$UWOzKoz{LZ{!^Ko!^!_M]!_#oKo#o#pM]#p~Ko7ZL`X$UWOzKoz{LZ{!PKo!P!QL{!Q!^Ko!^!_M]!_#oKo#o#pM]#p~Ko7ZMSR$UWU7RO!^%T!_#o%T#p~%T7RM`ROzM]z{Mi{~M]7RMlTOzM]z{Mi{!PM]!P!QM{!Q~M]7RNQOU7R7ZNX^$UW}POYJlYZKoZzJlz{NQ{!PJl!P!Q! T!Q!^Jl!^!_!!]!_!}Jl!}#O!'|#O#P!+a#P#oJl#o#p!!]#p~Jl7Z! ^_$UWU7R}PO!^%T!_#Z%T#Z#[Er#[#]%T#]#^Er#^#a%T#a#bEr#b#g%T#g#hEr#h#i%T#i#jEr#j#m%T#m#nEr#n#o%T#p~%T7R!!bY}POY!!]YZM]Zz!!]z{!#Q{!P!!]!P!Q!&x!Q!}!!]!}#O!$`#O#P!&f#P~!!]7R!#VY}POY!!]YZM]Zz!!]z{!#Q{!P!!]!P!Q!#u!Q!}!!]!}#O!$`#O#P!&f#P~!!]7R!#|UU7R}P#Z#[Gd#]#^Gd#a#bGd#g#hGd#i#jGd#m#nGd7R!$cWOY!$`YZM]Zz!$`z{!${{#O!$`#O#P!&S#P#Q!!]#Q~!$`7R!%OYOY!$`YZM]Zz!$`z{!${{!P!$`!P!Q!%n!Q#O!$`#O#P!&S#P#Q!!]#Q~!$`7R!%sTU7ROYG{Z#OG{#O#PH_#P#QFx#Q~G{7R!&VTOY!$`YZM]Zz!$`z{!${{~!$`7R!&iTOY!!]YZM]Zz!!]z{!#Q{~!!]7R!&}_}POzM]z{Mi{#ZM]#Z#[!&x#[#]M]#]#^!&x#^#aM]#a#b!&x#b#gM]#g#h!&x#h#iM]#i#j!&x#j#mM]#m#n!&x#n~M]7Z!(R[$UWOY!'|YZKoZz!'|z{!(w{!^!'|!^!_!$`!_#O!'|#O#P!*o#P#QJl#Q#o!'|#o#p!$`#p~!'|7Z!(|^$UWOY!'|YZKoZz!'|z{!(w{!P!'|!P!Q!)x!Q!^!'|!^!_!$`!_#O!'|#O#P!*o#P#QJl#Q#o!'|#o#p!$`#p~!'|7Z!*PY$UWU7ROYHqYZ%TZ!^Hq!^!_G{!_#OHq#O#PIf#P#QDu#Q#oHq#o#pG{#p~Hq7Z!*tX$UWOY!'|YZKoZz!'|z{!(w{!^!'|!^!_!$`!_#o!'|#o#p!$`#p~!'|7Z!+fX$UWOYJlYZKoZzJlz{NQ{!^Jl!^!_!!]!_#oJl#o#p!!]#p~Jl7Z!,Yc$UW}POzKoz{LZ{!^Ko!^!_M]!_#ZKo#Z#[!,R#[#]Ko#]#^!,R#^#aKo#a#b!,R#b#gKo#g#h!,R#h#iKo#i#j!,R#j#mKo#m#n!,R#n#oKo#o#pM]#p~Ko7Z!-lV$UWT7ROY!-eYZ%TZ!^!-e!^!_!.R!_#o!-e#o#p!.R#p~!-e7R!.WQT7ROY!.RZ~!.R$P!.g[$UW#o#v}POYDuYZ%TZ!PDu!P!QEr!Q!^Du!^!_Fx!_!}Du!}#OHq#O#PJQ#P#oDu#o#pFx#p~Du]!/f[#wS$UW}POYDuYZ%TZ!PDu!P!QEr!Q!^Du!^!_Fx!_!}Du!}#OHq#O#PJQ#P#oDu#o#pFx#p~Du!{!0cd$UWk!sO!O%T!O!P@r!P!Q%T!Q![!1q![!^%T!_!g%T!g!hAl!h#R%T#R#S!1q#S#U%T#U#V!3X#V#X%T#X#YAl#Y#b%T#b#c!2w#c#d!4m#d#l%T#l#m!5{#m#o%T#p~%T!{!1x_$UWk!sO!O%T!O!P@r!P!Q%T!Q![!1q![!^%T!_!g%T!g!hAl!h#R%T#R#S!1q#S#X%T#X#YAl#Y#b%T#b#c!2w#c#o%T#p~%T!{!3OR$UWk!sO!^%T!_#o%T#p~%T!{!3^W$UWO!Q%T!Q!R!3v!R!S!3v!S!^%T!_#R%T#R#S!3v#S#o%T#p~%T!{!3}Y$UWk!sO!Q%T!Q!R!3v!R!S!3v!S!^%T!_#R%T#R#S!3v#S#b%T#b#c!2w#c#o%T#p~%T!{!4rV$UWO!Q%T!Q!Y!5X!Y!^%T!_#R%T#R#S!5X#S#o%T#p~%T!{!5`X$UWk!sO!Q%T!Q!Y!5X!Y!^%T!_#R%T#R#S!5X#S#b%T#b#c!2w#c#o%T#p~%T!{!6QZ$UWO!Q%T!Q![!6s![!^%T!_!c%T!c!i!6s!i#R%T#R#S!6s#S#T%T#T#Z!6s#Z#o%T#p~%T!{!6z]$UWk!sO!Q%T!Q![!6s![!^%T!_!c%T!c!i!6s!i#R%T#R#S!6s#S#T%T#T#Z!6s#Z#b%T#b#c!2w#c#o%T#p~%T$u!7|R!]V$UW#m$fO!^%T!_#o%T#p~%T!q!8^R_!i$UWO!^%T!_#o%T#p~%T5w!8rR'bd!a/n#x&s'|P!P!Q!8{!^!_!9Q!_!`!9_W!9QO$WW#v!9VP#`#v!_!`!9Y#v!9_O#o#v#v!9dO#a#v$u!9kT!{$m$UWO!^%T!_!`'v!`!a!9z!a#o%T#p~%T$P!:RR#W#w$UWO!^%T!_#o%T#p~%T%V!:gT'a!R#a#v$RS$UWO!^%T!_!`!:v!`!a!;W!a#o%T#p~%T$O!:}R#a#v$UWO!^%T!_#o%T#p~%T$O!;_T#`#v$UWO!^%T!_!`5T!`!a!;n!a#o%T#p~%T$O!;uS#`#v$UWO!^%T!_!`5T!`#o%T#p~%T*a!<YV'p#{$UWO!O%T!O!P!<o!P!^%T!_!a%T!a!b!=P!b#o%T#p~%T*[!<vRv*S$UWO!^%T!_#o%T#p~%T$O!=WS$UW#j#vO!^%T!_!`5T!`#o%T#p~%T7V!=kRx6}$UWO!^%T!_#o%T#p~%Tk!={R!Oc$UWO!^%T!_#o%T#p~%T$O!>]S#g#v$UWO!^%T!_!`5T!`#o%T#p~%T$a!>pR$UW'f$XO!^%T!_#o%T#p~%T~!?OO!T~5b!?VT'w5Y$UWO!^%T!_!`5T!`#o%T#p#q!=P#q~%T6X!?oR!S5}nQ$UWO!^%T!_#o%T#p~%TX!@PR!kP$UWO!^%T!_#o%T#p~%T7Z!@gr$UW'Y7R#zS']$y'g3SOX%TXY%cYZ%TZ[%c[p%Tpq%cqt%Ttu2`u}%T}!O3j!O!Q%T!Q![2`![!^%T!_!c%T!c!}2`!}#R%T#R#S2`#S#T%T#T#o2`#p$f%T$f$g%c$g#BY2`#BY#BZ!@Y#BZ$IS2`$IS$I_!@Y$I_$JT2`$JT$JU!@Y$JU$KV2`$KV$KW!@Y$KW&FU2`&FU&FV!@Y&FV?HT2`?HT?HU!@Y?HU~2`7Z!CO_$UW'Z7R#zS']$y'g3SOt%Ttu2`u}%T}!O3j!O!Q%T!Q![2`![!^%T!_!c%T!c!}2`!}#R%T#R#S2`#S#T%T#T#o2`#p$g%T$g~2`",
+  tokenizers: [tsExtends, noSemicolon, incdecToken, template, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, insertSemicolon],
+  topRules: {"Script":[0,7]},
+  dialects: {jsx: 12107, ts: 12109},
+  dynamicPrecedences: {"149":1,"176":1},
+  specialized: [{term: 289, get: value => spec_identifier[value] || -1},{term: 299, get: value => spec_word[value] || -1},{term: 63, get: value => spec_LessThan[value] || -1}],
+  tokenPrec: 12130
+});
+
+/**
+A collection of JavaScript-related
+[snippets](https://codemirror.net/6/docs/ref/#autocomplete.snippet).
+*/
+const snippets = [
+    /*@__PURE__*/snippetCompletion("function ${name}(${params}) {\n\t${}\n}", {
+        label: "function",
+        detail: "definition",
+        type: "keyword"
+    }),
+    /*@__PURE__*/snippetCompletion("for (let ${index} = 0; ${index} < ${bound}; ${index}++) {\n\t${}\n}", {
+        label: "for",
+        detail: "loop",
+        type: "keyword"
+    }),
+    /*@__PURE__*/snippetCompletion("for (let ${name} of ${collection}) {\n\t${}\n}", {
+        label: "for",
+        detail: "of loop",
+        type: "keyword"
+    }),
+    /*@__PURE__*/snippetCompletion("do {\n\t${}\n} while (${})", {
+        label: "do",
+        detail: "loop",
+        type: "keyword"
+    }),
+    /*@__PURE__*/snippetCompletion("while (${}) {\n\t${}\n}", {
+        label: "while",
+        detail: "loop",
+        type: "keyword"
+    }),
+    /*@__PURE__*/snippetCompletion("try {\n\t${}\n} catch (${error}) {\n\t${}\n}", {
+        label: "try",
+        detail: "/ catch block",
+        type: "keyword"
+    }),
+    /*@__PURE__*/snippetCompletion("if (${}) {\n\t${}\n}", {
+        label: "if",
+        detail: "block",
+        type: "keyword"
+    }),
+    /*@__PURE__*/snippetCompletion("if (${}) {\n\t${}\n} else {\n\t${}\n}", {
+        label: "if",
+        detail: "/ else block",
+        type: "keyword"
+    }),
+    /*@__PURE__*/snippetCompletion("class ${name} {\n\tconstructor(${params}) {\n\t\t${}\n\t}\n}", {
+        label: "class",
+        detail: "definition",
+        type: "keyword"
+    }),
+    /*@__PURE__*/snippetCompletion("import {${names}} from \"${module}\"\n${}", {
+        label: "import",
+        detail: "named",
+        type: "keyword"
+    }),
+    /*@__PURE__*/snippetCompletion("import ${name} from \"${module}\"\n${}", {
+        label: "import",
+        detail: "default",
+        type: "keyword"
+    })
+];
+
+const cache = /*@__PURE__*/new NodeWeakMap();
+const ScopeNodes = /*@__PURE__*/new Set([
+    "Script", "Block",
+    "FunctionExpression", "FunctionDeclaration", "ArrowFunction", "MethodDeclaration",
+    "ForStatement"
+]);
+function defID(type) {
+    return (node, def) => {
+        let id = node.node.getChild("VariableDefinition");
+        if (id)
+            def(id, type);
+        return true;
+    };
+}
+const functionContext = ["FunctionDeclaration"];
+const gatherCompletions = {
+    FunctionDeclaration: /*@__PURE__*/defID("function"),
+    ClassDeclaration: /*@__PURE__*/defID("class"),
+    ClassExpression: () => true,
+    EnumDeclaration: /*@__PURE__*/defID("constant"),
+    TypeAliasDeclaration: /*@__PURE__*/defID("type"),
+    NamespaceDeclaration: /*@__PURE__*/defID("namespace"),
+    VariableDefinition(node, def) { if (!node.matchContext(functionContext))
+        def(node, "variable"); },
+    TypeDefinition(node, def) { def(node, "type"); },
+    __proto__: null
+};
+function getScope(doc, node) {
+    let cached = cache.get(node);
+    if (cached)
+        return cached;
+    let completions = [], top = true;
+    function def(node, type) {
+        let name = doc.sliceString(node.from, node.to);
+        completions.push({ label: name, type });
+    }
+    node.cursor(IterMode.IncludeAnonymous).iterate(node => {
+        if (top) {
+            top = false;
+        }
+        else if (node.name) {
+            let gather = gatherCompletions[node.name];
+            if (gather && gather(node, def) || ScopeNodes.has(node.name))
+                return false;
+        }
+        else if (node.to - node.from > 8192) {
+            // Allow caching for bigger internal nodes
+            for (let c of getScope(doc, node.node))
+                completions.push(c);
+            return false;
+        }
+    });
+    cache.set(node, completions);
+    return completions;
+}
+const Identifier = /^[\w$\xa1-\uffff][\w$\d\xa1-\uffff]*$/;
+const dontComplete = [
+    "TemplateString", "String", "RegExp",
+    "LineComment", "BlockComment",
+    "VariableDefinition", "TypeDefinition", "Label",
+    "PropertyDefinition", "PropertyName",
+    "PrivatePropertyDefinition", "PrivatePropertyName"
+];
+/**
+Completion source that looks up locally defined names in
+JavaScript code.
+*/
+function localCompletionSource(context) {
+    let inner = syntaxTree(context.state).resolveInner(context.pos, -1);
+    if (dontComplete.indexOf(inner.name) > -1)
+        return null;
+    let isWord = inner.to - inner.from < 20 && Identifier.test(context.state.sliceDoc(inner.from, inner.to));
+    if (!isWord && !context.explicit)
+        return null;
+    let options = [];
+    for (let pos = inner; pos; pos = pos.parent) {
+        if (ScopeNodes.has(pos.name))
+            options = options.concat(getScope(context.state.doc, pos));
+    }
+    return {
+        options,
+        from: isWord ? inner.from : context.pos,
+        validFor: Identifier
+    };
+}
+
+/**
+A language provider based on the [Lezer JavaScript
+parser](https://github.com/lezer-parser/javascript), extended with
+highlighting and indentation information.
+*/
+const javascriptLanguage = /*@__PURE__*/LRLanguage.define({
+    parser: /*@__PURE__*/parser.configure({
+        props: [
+            /*@__PURE__*/indentNodeProp.add({
+                IfStatement: /*@__PURE__*/continuedIndent({ except: /^\s*({|else\b)/ }),
+                TryStatement: /*@__PURE__*/continuedIndent({ except: /^\s*({|catch\b|finally\b)/ }),
+                LabeledStatement: flatIndent,
+                SwitchBody: context => {
+                    let after = context.textAfter, closed = /^\s*\}/.test(after), isCase = /^\s*(case|default)\b/.test(after);
+                    return context.baseIndent + (closed ? 0 : isCase ? 1 : 2) * context.unit;
+                },
+                Block: /*@__PURE__*/delimitedIndent({ closing: "}" }),
+                ArrowFunction: cx => cx.baseIndent + cx.unit,
+                "TemplateString BlockComment": () => null,
+                "Statement Property": /*@__PURE__*/continuedIndent({ except: /^{/ }),
+                JSXElement(context) {
+                    let closed = /^\s*<\//.test(context.textAfter);
+                    return context.lineIndent(context.node.from) + (closed ? 0 : context.unit);
+                },
+                JSXEscape(context) {
+                    let closed = /\s*\}/.test(context.textAfter);
+                    return context.lineIndent(context.node.from) + (closed ? 0 : context.unit);
+                },
+                "JSXOpenTag JSXSelfClosingTag"(context) {
+                    return context.column(context.node.from) + context.unit;
+                }
+            }),
+            /*@__PURE__*/foldNodeProp.add({
+                "Block ClassBody SwitchBody EnumBody ObjectExpression ArrayExpression": foldInside,
+                BlockComment(tree) { return { from: tree.from + 2, to: tree.to - 2 }; }
+            })
+        ]
+    }),
+    languageData: {
+        closeBrackets: { brackets: ["(", "[", "{", "'", '"', "`"] },
+        commentTokens: { line: "//", block: { open: "/*", close: "*/" } },
+        indentOnInput: /^\s*(?:case |default:|\{|\}|<\/)$/,
+        wordChars: "$"
+    }
+});
+/**
+A language provider for TypeScript.
+*/
+const typescriptLanguage = /*@__PURE__*/javascriptLanguage.configure({ dialect: "ts" });
+/**
+Language provider for JSX.
+*/
+const jsxLanguage = /*@__PURE__*/javascriptLanguage.configure({ dialect: "jsx" });
+/**
+Language provider for JSX + TypeScript.
+*/
+const tsxLanguage = /*@__PURE__*/javascriptLanguage.configure({ dialect: "jsx ts" });
+const keywords = /*@__PURE__*/"break case const continue default delete export extends false finally in instanceof let new return static super switch this throw true typeof var yield".split(" ").map(kw => ({ label: kw, type: "keyword" }));
+/**
+JavaScript support. Includes [snippet](https://codemirror.net/6/docs/ref/#lang-javascript.snippets)
+completion.
+*/
+function javascript(config = {}) {
+    let lang = config.jsx ? (config.typescript ? tsxLanguage : jsxLanguage)
+        : config.typescript ? typescriptLanguage : javascriptLanguage;
+    return new LanguageSupport(lang, [
+        javascriptLanguage.data.of({
+            autocomplete: ifNotIn(dontComplete, completeFromList(snippets.concat(keywords)))
+        }),
+        javascriptLanguage.data.of({
+            autocomplete: localCompletionSource
+        }),
+        config.jsx ? autoCloseTags : [],
+    ]);
+}
+function elementName(doc, tree, max = doc.length) {
+    if (!tree)
+        return "";
+    let name = tree.getChild("JSXIdentifier");
+    return name ? doc.sliceString(name.from, Math.min(name.to, max)) : "";
+}
+const android = typeof navigator == "object" && /*@__PURE__*//Android\b/.test(navigator.userAgent);
+/**
+Extension that will automatically insert JSX close tags when a `>` or
+`/` is typed.
+*/
+const autoCloseTags = /*@__PURE__*/EditorView.inputHandler.of((view, from, to, text) => {
+    if ((android ? view.composing : view.compositionStarted) || view.state.readOnly ||
+        from != to || (text != ">" && text != "/") ||
+        !javascriptLanguage.isActiveAt(view.state, from, -1))
+        return false;
+    let { state } = view;
+    let changes = state.changeByRange(range => {
+        var _a, _b, _c;
+        let { head } = range, around = syntaxTree(state).resolveInner(head, -1), name;
+        if (around.name == "JSXStartTag")
+            around = around.parent;
+        if (text == ">" && around.name == "JSXFragmentTag") {
+            return { range: EditorSelection.cursor(head + 1), changes: { from: head, insert: `><>` } };
+        }
+        else if (text == ">" && around.name == "JSXIdentifier") {
+            if (((_b = (_a = around.parent) === null || _a === void 0 ? void 0 : _a.lastChild) === null || _b === void 0 ? void 0 : _b.name) != "JSXEndTag" && (name = elementName(state.doc, around.parent, head)))
+                return { range: EditorSelection.cursor(head + 1), changes: { from: head, insert: `></${name}>` } };
+        }
+        else if (text == "/" && around.name == "JSXFragmentTag") {
+            let empty = around.parent, base = empty === null || empty === void 0 ? void 0 : empty.parent;
+            if (empty.from == head - 1 && ((_c = base.lastChild) === null || _c === void 0 ? void 0 : _c.name) != "JSXEndTag" && (name = elementName(state.doc, base === null || base === void 0 ? void 0 : base.firstChild, head))) {
+                let insert = `/${name}>`;
+                return { range: EditorSelection.cursor(head + insert.length), changes: { from: head, insert } };
+            }
+        }
+        return { range };
+    });
+    if (changes.changes.empty)
+        return false;
+    view.dispatch(changes, { userEvent: "input.type", scrollIntoView: true });
+    return true;
+});
 
 // Using https://github.com/one-dark/vscode-one-dark-theme/ as reference for the colors
 const chalky = "#e5c07b", coral = "#e06c75", cyan = "#56b6c2", invalid = "#ffffff", ivory = "#abb2bf", stone = "#7d8799", // Brightened compared to original to increase contrast
@@ -14294,52 +21405,254 @@ the highlight style).
 */
 const oneDark = [oneDarkTheme, /*@__PURE__*/syntaxHighlighting(oneDarkHighlightStyle)];
 
-//import { basicSetup } from 'codemirror';
+const indentationMark = /*@__PURE__*/Decoration.mark({
+    class: 'cm-indentation-marker',
+    tagName: 'span',
+});
+/**
+ * Widget used to simulate N indentation markers on empty lines.
+ */
+class IndentationWidget extends WidgetType {
+    constructor(numIndent) {
+        super();
+        this.numIndent = numIndent;
+    }
+    eq(other) {
+        return this.numIndent === other.numIndent;
+    }
+    toDOM(view) {
+        const indentSize = getIndentUnit(view.state);
+        const wrapper = document.createElement('span');
+        wrapper.style.top = '0';
+        wrapper.style.left = '4px';
+        wrapper.style.position = 'absolute';
+        wrapper.style.pointerEvents = 'none';
+        for (let indent = 0; indent < this.numIndent; indent++) {
+            const element = document.createElement('span');
+            element.className = 'cm-indentation-marker';
+            element.innerHTML = `${' '.repeat(indentSize)}`;
+            wrapper.appendChild(element);
+        }
+        return wrapper;
+    }
+}
+/**
+ * Returns the number of indentation markers a non-empty line should have
+ * based on the text in the line and the size of the indent.
+ */
+function getNumIndentMarkersForNonEmptyLine(text, indentSize, onIndentMarker) {
+    let numIndents = 0;
+    let numConsecutiveSpaces = 0;
+    let prevChar = null;
+    for (let char = 0; char < text.length; char++) {
+        // Bail if we encounter a non-whitespace character
+        if (text[char] !== ' ' && text[char] !== '\t') {
+            // We still increment the indentation level if we would
+            // have added a marker here had this been a space or tab.
+            if (numConsecutiveSpaces % indentSize === 0 && char !== 0) {
+                numIndents++;
+            }
+            return numIndents;
+        }
+        // Every tab and N space has an indentation marker
+        const shouldAddIndent = prevChar === '\t' || numConsecutiveSpaces % indentSize === 0;
+        if (shouldAddIndent) {
+            numIndents++;
+            if (onIndentMarker) {
+                onIndentMarker(char);
+            }
+        }
+        if (text[char] === ' ') {
+            numConsecutiveSpaces++;
+        }
+        else {
+            numConsecutiveSpaces = 0;
+        }
+        prevChar = text[char];
+    }
+    return numIndents;
+}
+/**
+ * Returns the number of indent markers an empty line should have
+ * based on the number of indent markers of the previous
+ * and next non-empty lines.
+ */
+function getNumIndentMarkersForEmptyLine(prev, next) {
+    const min = Math.min(prev, next);
+    const max = Math.max(prev, next);
+    // If only one side is non-zero, we add one marker
+    // until the next non-empty line.
+    if (min === 0 && max > 0) {
+        return 1;
+    }
+    // If they're equal and nonzero then
+    // take one less than the minimum
+    if (min === max && min > 0) {
+        return min - 1;
+    }
+    // Else, default to the minimum of the two
+    return min;
+}
+/**
+ * Returns the next non-empty line and its indent level.
+ */
+function findNextNonEmptyLineAndIndentLevel(doc, startLine, indentSize) {
+    const numLines = doc.lines;
+    let lineNo = startLine;
+    while (lineNo <= numLines) {
+        const { text } = doc.line(lineNo);
+        if (text.trim().length === 0) {
+            lineNo++;
+            continue;
+        }
+        const indent = getNumIndentMarkersForNonEmptyLine(text, indentSize);
+        return [lineNo, indent];
+    }
+    // Reached the end of the doc
+    return [numLines + 1, 0];
+}
+/**
+ * Adds indentation markers to all lines within view.
+ */
+function addIndentationMarkers(view) {
+    const builder = new RangeSetBuilder();
+    const indentSize = getIndentUnit(view.state);
+    const markers = [];
+    for (const { from, to } of view.visibleRanges) {
+        let pos = from;
+        let prevIndentMarkers = 0;
+        let nextIndentMarkers = 0;
+        let nextNonEmptyLine = 0;
+        while (pos <= to) {
+            const line = view.state.doc.lineAt(pos);
+            const { text } = line;
+            // If a line is empty, we match the indentation according
+            // to a heuristic based on the indentations of the
+            // previous and next non-empty lines.
+            if (text.trim().length === 0) {
+                // To retrieve the next non-empty indentation level,
+                // we perform a lookahead and cache the result.
+                if (nextNonEmptyLine < line.number) {
+                    const [nextLine, nextIndent] = findNextNonEmptyLineAndIndentLevel(view.state.doc, line.number + 1, indentSize);
+                    nextNonEmptyLine = nextLine;
+                    nextIndentMarkers = nextIndent;
+                }
+                const numIndentMarkers = getNumIndentMarkersForEmptyLine(prevIndentMarkers, nextIndentMarkers);
+                const indentationWidget = Decoration.widget({
+                    widget: new IndentationWidget(numIndentMarkers),
+                });
+                // Add the indent widget and move on to next line
+                markers.push({
+                    from: line.from,
+                    to: line.from,
+                    decoration: indentationWidget,
+                });
+                pos = line.to + 1;
+                continue;
+            }
+            prevIndentMarkers = getNumIndentMarkersForNonEmptyLine(text, indentSize, (char) => {
+                const charPos = line.from + char;
+                markers.push({
+                    from: charPos,
+                    to: charPos + 1,
+                    decoration: indentationMark,
+                });
+            });
+            // Move on to the next line
+            pos = line.to + 1;
+        }
+    }
+    markers.sort((a, b) => a.from - b.from);
+    markers.forEach(({ from, to, decoration }) => {
+        builder.add(from, to, decoration);
+    });
+    return builder.finish();
+}
+function createIndentationMarkerPlugin() {
+    return ViewPlugin.define((view) => ({
+        decorations: addIndentationMarkers(view),
+        update(update) {
+            if (update.docChanged || update.viewportChanged) {
+                this.decorations = addIndentationMarkers(update.view);
+            }
+        },
+    }), {
+        decorations: (v) => v.decorations,
+    });
+}
+const LIGHT_BACKGROUND = 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAACCAYAAACZgbYnAAAAE0lEQVQImWP4\/\/\/\/f4bLly//BwAmVgd1/w11/gAAAABJRU5ErkJggg==") left repeat-y';
+const DARK_BACKGROUND = 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAACCAYAAACZgbYnAAAAEklEQVQImWNgYGBgYHB3d/8PAAOIAdULw8qMAAAAAElFTkSuQmCC") left repeat-y';
+const indentationMarkerBaseTheme = /*@__PURE__*/EditorView.baseTheme({
+    '.cm-line': {
+        position: `relative`,
+    },
+    '.cm-indentation-marker': {
+        display: `inline-block`,
+    },
+    '&light .cm-indentation-marker': {
+        background: LIGHT_BACKGROUND,
+    },
+    '&dark .cm-indentation-marker': {
+        background: DARK_BACKGROUND,
+    },
+});
+function indentationMarkers() {
+    return [
+        createIndentationMarkerPlugin(),
+        indentationMarkerBaseTheme,
+    ];
+}
 
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
+// editorDiv.style.backgroundColor = 'turquoise';
+// editorDiv.style.backgroundColor = '#232323';
 editorDiv.style.width = '100%';
-//editorDiv.style.whiteSpace = 'nowrap'
+//editorDiv.style.height = '100%';
 document.body.appendChild(editorDiv);
 
-const defaultValue = `📝 2022/07/23
+const codeSample = ``;
 
-class 用途に置き換えていく
-
-keyboard と、key(s) を同時に持たせてるのも気持ち悪いか
-
-keyboard で持たせるもの
-
-key.el を格納していたが、key 🎹を持たせることにしている
-
-持たせる要素として、めちゃくちゃ大きいから、メモリ的にはもったいない？
-
-settings のキーボード設定
-
-どのくらいのオクターブを持たせるか？と、どの音からスタートするのか？との関係が少々面倒かも
-🤔
-`;
-
-/*
-let view = new EditorView({
-  doc: defaultValue,
-  extensions: [basicSetup],
-  //parent: document.body,
-  parent: document.querySelector('#editorWrap'),
+const myTheme = EditorView.baseTheme({
+  '&.cm-editor': {
+    fontSize: '0.8rem',
+  },
+  '.cm-scroller': {
+    fontFamily:
+      'Consolas, Menlo, Monaco, source-code-pro, Courier New, monospace',
+  },
 });
-*/
+
+
+const tabSize = new Compartment();
+
+const state = EditorState.create({
+  extensions: [
+    minimalSetup,
+    /* diff basicSetup */
+    lineNumbers(),
+    highlightActiveLineGutter(),
+    highlightActiveLine(),
+    dropCursor(),
+    indentOnInput(),
+    bracketMatching(),
+    highlightSelectionMatches(),
+    closeBrackets(),
+    autocompletion(),
+    keymap.of([...closeBracketsKeymap, ...completionKeymap]),
+    /* --- basicSetup */
+    tabSize.of(EditorState.tabSize.of(2)),
+    EditorView.lineWrapping, // 改行
+    javascript(),
+    oneDark, // theme
+    myTheme, // custom
+    indentationMarkers(),
+  ]
+});
+
 
 new EditorView({
-  state: EditorState.create({
-    doc: defaultValue,
-    extensions: [
-      lineNumbers(),
-      highlightActiveLine(),
-      highlightActiveLineGutter(),
-      EditorView.lineWrapping,
-      oneDark,
-    ],
-  }),
-  //parent: document.body,
-  parent: document.querySelector('#editorWrap'),
+  doc: codeSample,
+  state,
+  parent: editorDiv,
 });
