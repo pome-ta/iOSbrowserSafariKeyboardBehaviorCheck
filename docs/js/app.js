@@ -52,17 +52,26 @@ const myTheme = EditorView.baseTheme({
   },
 });
 
-//const tabSize = new Compartment();
+const tabSize = new Compartment();
+
+const u00b7 = '·'; // ラテン語中点
+const u2018 = '∘'; // RING OPERATOR
+const u2022 = '•'; // bullet
+const u2023 = '‣'; // triangular bullet
+const u2219 = '∙'; // BULLET OPERATOR
+const u22c5 = '⋅'; // DOT OPERATOR
+const u30fb = '・'; // 全角中点
+const uff65 = '･'; // 半角中点
 
 const myHiChars = highlightSpecialChars({
   render: (code) => {
     let node = document.createElement('span');
-    node.innerText = '•';
+    node.style.opacity = 0.25;
+    node.innerText = u22c5;
     node.title = '\\u' + code.toString(16);
-    console.log(node);
     return node;
   },
-  //specialChars: /[\x01-\x08\x0B-\x1F]/g
+  specialChars: /\x20/g,
 });
 
 const state = EditorState.create({
@@ -81,13 +90,12 @@ const state = EditorState.create({
     autocompletion(),
     keymap.of([...closeBracketsKeymap, ...completionKeymap]),
     /* --- basicSetup */
-    //tabSize.of(EditorState.tabSize.of(4)),
+    tabSize.of(EditorState.tabSize.of(4)),
     EditorView.lineWrapping, // 改行
     python(),
-    //oneDark, // theme
-    //myTheme, // custom
-    //indentationMarkers(),
-    //highlightSpecialChars(),
+    oneDark, // theme
+    myTheme, // custom
+    indentationMarkers(),
     myHiChars,
   ],
 });
