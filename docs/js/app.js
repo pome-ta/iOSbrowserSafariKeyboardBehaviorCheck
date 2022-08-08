@@ -19,11 +19,19 @@ import {
   completionKeymap,
 } from '@codemirror/autocomplete';
 
-//import { javascript } from '@codemirror/lang-javascript';
-import { python } from '@codemirror/lang-python';
+import { javascript } from '@codemirror/lang-javascript';
+//import { python } from '@codemirror/lang-python';
 
 import { oneDark } from '@codemirror/theme-one-dark';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
+
+
+const undoDiv = document.createElement('div');
+undoDiv.textContent = 'undo';
+undoDiv.style.width = '100%';
+undoDiv.style.height = '4rem';
+undoDiv.style.background = 'red';
+document.body.appendChild(undoDiv);
 
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
@@ -33,13 +41,26 @@ editorDiv.style.width = '100%';
 //editorDiv.style.height = '100%';
 document.body.appendChild(editorDiv);
 
-const codeSample = `import math
-
-def calc_distance(x1, y1, x2, y2):
-    diff_x = x1 - x2
-    diff_y = y1 - y2
-
-    return math.sqrt(diff_x**2 + diff_y**2)
+const codeSample = `function setupRangeToSectionInputValue(
+  inputElement,
+  textCaptionStr,
+  unitCaptionStr = null
+) {
+  const textNodeCaption = document.createTextNode(textCaptionStr);
+  const inputValue = document.createElement('span');
+  const textNodeUnit =
+    unitCaptionStr !== null ? document.createTextNode(unitCaptionStr) : null;
+  const wrap = document.createElement('div');
+  wrap.style.width = '88%';
+  wrap.style.margin = 'auto';
+  const rangeSection = setAppendChild(
+    [textNodeCaption, inputValue, textNodeUnit, wrap, [inputElement]].filter(
+      (child) => child !== null
+    ),
+    createSection()
+  );
+  return [rangeSection, inputValue];
+}
 `;
 
 const myTheme = EditorView.baseTheme({
@@ -92,7 +113,8 @@ const state = EditorState.create({
     /* --- basicSetup */
     //tabSize.of(EditorState.tabSize.of(4)),
     EditorView.lineWrapping, // 改行
-    python(),
+    //python(),
+    javascript(),
     //oneDark, // theme
     myTheme, // custom
     //indentationMarkers(),
