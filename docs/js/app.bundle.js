@@ -20770,313 +20770,6 @@ function python() {
     return new LanguageSupport(pythonLanguage);
 }
 
-// Using https://github.com/one-dark/vscode-one-dark-theme/ as reference for the colors
-const chalky = "#e5c07b", coral = "#e06c75", cyan = "#56b6c2", invalid = "#ffffff", ivory = "#abb2bf", stone = "#7d8799", // Brightened compared to original to increase contrast
-malibu = "#61afef", sage = "#98c379", whiskey = "#d19a66", violet = "#c678dd", darkBackground = "#21252b", highlightBackground = "#2c313a", background = "#282c34", tooltipBackground = "#353a42", selection = "#3E4451", cursor = "#528bff";
-/**
-The editor theme styles for One Dark.
-*/
-const oneDarkTheme = /*@__PURE__*/EditorView.theme({
-    "&": {
-        color: ivory,
-        backgroundColor: background
-    },
-    ".cm-content": {
-        caretColor: cursor
-    },
-    ".cm-cursor, .cm-dropCursor": { borderLeftColor: cursor },
-    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: selection },
-    ".cm-panels": { backgroundColor: darkBackground, color: ivory },
-    ".cm-panels.cm-panels-top": { borderBottom: "2px solid black" },
-    ".cm-panels.cm-panels-bottom": { borderTop: "2px solid black" },
-    ".cm-searchMatch": {
-        backgroundColor: "#72a1ff59",
-        outline: "1px solid #457dff"
-    },
-    ".cm-searchMatch.cm-searchMatch-selected": {
-        backgroundColor: "#6199ff2f"
-    },
-    ".cm-activeLine": { backgroundColor: highlightBackground },
-    ".cm-selectionMatch": { backgroundColor: "#aafe661a" },
-    "&.cm-focused .cm-matchingBracket, &.cm-focused .cm-nonmatchingBracket": {
-        backgroundColor: "#bad0f847",
-        outline: "1px solid #515a6b"
-    },
-    ".cm-gutters": {
-        backgroundColor: background,
-        color: stone,
-        border: "none"
-    },
-    ".cm-activeLineGutter": {
-        backgroundColor: highlightBackground
-    },
-    ".cm-foldPlaceholder": {
-        backgroundColor: "transparent",
-        border: "none",
-        color: "#ddd"
-    },
-    ".cm-tooltip": {
-        border: "none",
-        backgroundColor: tooltipBackground
-    },
-    ".cm-tooltip .cm-tooltip-arrow:before": {
-        borderTopColor: "transparent",
-        borderBottomColor: "transparent"
-    },
-    ".cm-tooltip .cm-tooltip-arrow:after": {
-        borderTopColor: tooltipBackground,
-        borderBottomColor: tooltipBackground
-    },
-    ".cm-tooltip-autocomplete": {
-        "& > ul > li[aria-selected]": {
-            backgroundColor: highlightBackground,
-            color: ivory
-        }
-    }
-}, { dark: true });
-/**
-The highlighting style for code in the One Dark theme.
-*/
-const oneDarkHighlightStyle = /*@__PURE__*/HighlightStyle.define([
-    { tag: tags.keyword,
-        color: violet },
-    { tag: [tags.name, tags.deleted, tags.character, tags.propertyName, tags.macroName],
-        color: coral },
-    { tag: [/*@__PURE__*/tags.function(tags.variableName), tags.labelName],
-        color: malibu },
-    { tag: [tags.color, /*@__PURE__*/tags.constant(tags.name), /*@__PURE__*/tags.standard(tags.name)],
-        color: whiskey },
-    { tag: [/*@__PURE__*/tags.definition(tags.name), tags.separator],
-        color: ivory },
-    { tag: [tags.typeName, tags.className, tags.number, tags.changed, tags.annotation, tags.modifier, tags.self, tags.namespace],
-        color: chalky },
-    { tag: [tags.operator, tags.operatorKeyword, tags.url, tags.escape, tags.regexp, tags.link, /*@__PURE__*/tags.special(tags.string)],
-        color: cyan },
-    { tag: [tags.meta, tags.comment],
-        color: stone },
-    { tag: tags.strong,
-        fontWeight: "bold" },
-    { tag: tags.emphasis,
-        fontStyle: "italic" },
-    { tag: tags.strikethrough,
-        textDecoration: "line-through" },
-    { tag: tags.link,
-        color: stone,
-        textDecoration: "underline" },
-    { tag: tags.heading,
-        fontWeight: "bold",
-        color: coral },
-    { tag: [tags.atom, tags.bool, /*@__PURE__*/tags.special(tags.variableName)],
-        color: whiskey },
-    { tag: [tags.processingInstruction, tags.string, tags.inserted],
-        color: sage },
-    { tag: tags.invalid,
-        color: invalid },
-]);
-/**
-Extension to enable the One Dark theme (both the editor theme and
-the highlight style).
-*/
-const oneDark = [oneDarkTheme, /*@__PURE__*/syntaxHighlighting(oneDarkHighlightStyle)];
-
-const indentationMark = /*@__PURE__*/Decoration.mark({
-    class: 'cm-indentation-marker',
-    tagName: 'span',
-});
-/**
- * Widget used to simulate N indentation markers on empty lines.
- */
-class IndentationWidget extends WidgetType {
-    constructor(numIndent) {
-        super();
-        this.numIndent = numIndent;
-    }
-    eq(other) {
-        return this.numIndent === other.numIndent;
-    }
-    toDOM(view) {
-        const indentSize = getIndentUnit(view.state);
-        const wrapper = document.createElement('span');
-        wrapper.style.top = '0';
-        wrapper.style.left = '4px';
-        wrapper.style.position = 'absolute';
-        wrapper.style.pointerEvents = 'none';
-        for (let indent = 0; indent < this.numIndent; indent++) {
-            const element = document.createElement('span');
-            element.className = 'cm-indentation-marker';
-            element.innerHTML = `${' '.repeat(indentSize)}`;
-            wrapper.appendChild(element);
-        }
-        return wrapper;
-    }
-}
-/**
- * Returns the number of indentation markers a non-empty line should have
- * based on the text in the line and the size of the indent.
- */
-function getNumIndentMarkersForNonEmptyLine(text, indentSize, onIndentMarker) {
-    let numIndents = 0;
-    let numConsecutiveSpaces = 0;
-    let prevChar = null;
-    for (let char = 0; char < text.length; char++) {
-        // Bail if we encounter a non-whitespace character
-        if (text[char] !== ' ' && text[char] !== '\t') {
-            // We still increment the indentation level if we would
-            // have added a marker here had this been a space or tab.
-            if (numConsecutiveSpaces % indentSize === 0 && char !== 0) {
-                numIndents++;
-            }
-            return numIndents;
-        }
-        // Every tab and N space has an indentation marker
-        const shouldAddIndent = prevChar === '\t' || numConsecutiveSpaces % indentSize === 0;
-        if (shouldAddIndent) {
-            numIndents++;
-            if (onIndentMarker) {
-                onIndentMarker(char);
-            }
-        }
-        if (text[char] === ' ') {
-            numConsecutiveSpaces++;
-        }
-        else {
-            numConsecutiveSpaces = 0;
-        }
-        prevChar = text[char];
-    }
-    return numIndents;
-}
-/**
- * Returns the number of indent markers an empty line should have
- * based on the number of indent markers of the previous
- * and next non-empty lines.
- */
-function getNumIndentMarkersForEmptyLine(prev, next) {
-    const min = Math.min(prev, next);
-    const max = Math.max(prev, next);
-    // If only one side is non-zero, we add one marker
-    // until the next non-empty line.
-    if (min === 0 && max > 0) {
-        return 1;
-    }
-    // If they're equal and nonzero then
-    // take one less than the minimum
-    if (min === max && min > 0) {
-        return min - 1;
-    }
-    // Else, default to the minimum of the two
-    return min;
-}
-/**
- * Returns the next non-empty line and its indent level.
- */
-function findNextNonEmptyLineAndIndentLevel(doc, startLine, indentSize) {
-    const numLines = doc.lines;
-    let lineNo = startLine;
-    while (lineNo <= numLines) {
-        const { text } = doc.line(lineNo);
-        if (text.trim().length === 0) {
-            lineNo++;
-            continue;
-        }
-        const indent = getNumIndentMarkersForNonEmptyLine(text, indentSize);
-        return [lineNo, indent];
-    }
-    // Reached the end of the doc
-    return [numLines + 1, 0];
-}
-/**
- * Adds indentation markers to all lines within view.
- */
-function addIndentationMarkers(view) {
-    const builder = new RangeSetBuilder();
-    const indentSize = getIndentUnit(view.state);
-    const markers = [];
-    for (const { from, to } of view.visibleRanges) {
-        let pos = from;
-        let prevIndentMarkers = 0;
-        let nextIndentMarkers = 0;
-        let nextNonEmptyLine = 0;
-        while (pos <= to) {
-            const line = view.state.doc.lineAt(pos);
-            const { text } = line;
-            // If a line is empty, we match the indentation according
-            // to a heuristic based on the indentations of the
-            // previous and next non-empty lines.
-            if (text.trim().length === 0) {
-                // To retrieve the next non-empty indentation level,
-                // we perform a lookahead and cache the result.
-                if (nextNonEmptyLine < line.number) {
-                    const [nextLine, nextIndent] = findNextNonEmptyLineAndIndentLevel(view.state.doc, line.number + 1, indentSize);
-                    nextNonEmptyLine = nextLine;
-                    nextIndentMarkers = nextIndent;
-                }
-                const numIndentMarkers = getNumIndentMarkersForEmptyLine(prevIndentMarkers, nextIndentMarkers);
-                const indentationWidget = Decoration.widget({
-                    widget: new IndentationWidget(numIndentMarkers),
-                });
-                // Add the indent widget and move on to next line
-                markers.push({
-                    from: line.from,
-                    to: line.from,
-                    decoration: indentationWidget,
-                });
-                pos = line.to + 1;
-                continue;
-            }
-            prevIndentMarkers = getNumIndentMarkersForNonEmptyLine(text, indentSize, (char) => {
-                const charPos = line.from + char;
-                markers.push({
-                    from: charPos,
-                    to: charPos + 1,
-                    decoration: indentationMark,
-                });
-            });
-            // Move on to the next line
-            pos = line.to + 1;
-        }
-    }
-    markers.sort((a, b) => a.from - b.from);
-    markers.forEach(({ from, to, decoration }) => {
-        builder.add(from, to, decoration);
-    });
-    return builder.finish();
-}
-function createIndentationMarkerPlugin() {
-    return ViewPlugin.define((view) => ({
-        decorations: addIndentationMarkers(view),
-        update(update) {
-            if (update.docChanged || update.viewportChanged) {
-                this.decorations = addIndentationMarkers(update.view);
-            }
-        },
-    }), {
-        decorations: (v) => v.decorations,
-    });
-}
-const LIGHT_BACKGROUND = 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAACCAYAAACZgbYnAAAAE0lEQVQImWP4\/\/\/\/f4bLly//BwAmVgd1/w11/gAAAABJRU5ErkJggg==") left repeat-y';
-const DARK_BACKGROUND = 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAACCAYAAACZgbYnAAAAEklEQVQImWNgYGBgYHB3d/8PAAOIAdULw8qMAAAAAElFTkSuQmCC") left repeat-y';
-const indentationMarkerBaseTheme = /*@__PURE__*/EditorView.baseTheme({
-    '.cm-line': {
-        position: `relative`,
-    },
-    '.cm-indentation-marker': {
-        display: `inline-block`,
-    },
-    '&light .cm-indentation-marker': {
-        background: LIGHT_BACKGROUND,
-    },
-    '&dark .cm-indentation-marker': {
-        background: DARK_BACKGROUND,
-    },
-});
-function indentationMarkers() {
-    return [
-        createIndentationMarkerPlugin(),
-        indentationMarkerBaseTheme,
-    ];
-}
-
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
 // editorDiv.style.backgroundColor = 'turquoise';
@@ -21104,13 +20797,13 @@ const myTheme = EditorView.baseTheme({
   },
 });
 
-const tabSize = new Compartment();
+new Compartment();
 const u22c5 = '⋅'; // DOT OPERATOR
 
-const myHiChars = highlightSpecialChars({
+const whitespaceShow = highlightSpecialChars({
   render: (code) => {
     let node = document.createElement('span');
-    node.style.opacity = 0.25;
+    node.style.opacity = 0.5;
     node.innerText = u22c5;
     node.title = '\\u' + code.toString(16);
     return node;
@@ -21134,13 +20827,13 @@ const state = EditorState.create({
     autocompletion(),
     keymap.of([...closeBracketsKeymap, ...completionKeymap]),
     /* --- basicSetup */
-    tabSize.of(EditorState.tabSize.of(4)),
+    //tabSize.of(EditorState.tabSize.of(4)),
     EditorView.lineWrapping, // 改行
     python(),
-    oneDark, // theme
+    //oneDark, // theme
     myTheme, // custom
-    indentationMarkers(),
-    myHiChars,
+    //indentationMarkers(),
+    whitespaceShow,
   ],
 });
 

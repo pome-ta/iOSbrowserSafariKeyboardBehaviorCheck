@@ -63,10 +63,10 @@ const u22c5 = '⋅'; // DOT OPERATOR
 const u30fb = '・'; // 全角中点
 const uff65 = '･'; // 半角中点
 
-const myHiChars = highlightSpecialChars({
+const whitespaceShow = highlightSpecialChars({
   render: (code) => {
     let node = document.createElement('span');
-    node.style.opacity = 0.25;
+    node.style.opacity = 0.5;
     node.innerText = u22c5;
     node.title = '\\u' + code.toString(16);
     return node;
@@ -90,13 +90,13 @@ const state = EditorState.create({
     autocompletion(),
     keymap.of([...closeBracketsKeymap, ...completionKeymap]),
     /* --- basicSetup */
-    tabSize.of(EditorState.tabSize.of(4)),
+    //tabSize.of(EditorState.tabSize.of(4)),
     EditorView.lineWrapping, // 改行
     python(),
-    oneDark, // theme
+    //oneDark, // theme
     myTheme, // custom
-    indentationMarkers(),
-    myHiChars,
+    //indentationMarkers(),
+    whitespaceShow,
   ],
 });
 
