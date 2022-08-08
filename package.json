@@ -12,6 +12,7 @@
     "rollup": "^2.77.2"
   },
   "dependencies": {
+    "@codemirror/lang-cpp": "^6.0.1",
     "@codemirror/lang-javascript": "^6.0.2",
     "@codemirror/lang-python": "^6.0.1",
     "@codemirror/theme-one-dark": "^6.0.0",

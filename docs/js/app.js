@@ -21,7 +21,8 @@ import {
 import { undo, redo, indentWithTab } from '@codemirror/commands';
 
 import { javascript } from '@codemirror/lang-javascript';
-//import { python } from '@codemirror/lang-python';
+import { python } from '@codemirror/lang-python';
+import { cpp } from '@codemirror/lang-cpp';
 
 import { oneDark } from '@codemirror/theme-one-dark';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
@@ -44,11 +45,14 @@ undoDiv.style.width = '100%';
 undoDiv.style.height = '4rem';
 undoDiv.style.background = 'red';
 
+document.body.appendChild(undoDiv);
+
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
 // editorDiv.style.backgroundColor = 'turquoise';
 // editorDiv.style.backgroundColor = '#232323';
 editorDiv.style.width = '100%';
+//editorDiv.style.height = '100%';
 // editorDiv.style.position = 'absolute';
 // editorDiv.style.position = 'relative';
 // editorDiv.style.position = 'static';
@@ -56,30 +60,12 @@ editorDiv.style.width = '100%';
 // editorDiv.style.position = 'fixed';
 // editorDiv.style.zIndex = 2;
 // editorDiv.style.top = 0;
-//editorDiv.style.height = '100%';
+
+
+
 document.body.appendChild(editorDiv);
 
-const codeSample = `function setupRangeToSectionInputValue(
-  inputElement,
-  textCaptionStr,
-  unitCaptionStr = null
-  ) {
-    const textNodeCaption = document.createTextNode(textCaptionStr);
-    const inputValue = document.createElement('span');
-    const textNodeUnit =
-    unitCaptionStr !== null ? document.createTextNode(unitCaptionStr) : null;
-    const wrap = document.createElement('div');
-    wrap.style.width = '88%';
-    wrap.style.margin = 'auto';
-    const rangeSection = setAppendChild(
-      [textNodeCaption, inputValue, textNodeUnit, wrap, [inputElement]].filter(
-        (child) => child !== null
-        ),
-        createSection()
-        );
-        return [rangeSection, inputValue];
-      }
-      `;
+const codeSample = ``;
 
 const myTheme = EditorView.baseTheme({
   '&.cm-editor': {
@@ -91,7 +77,7 @@ const myTheme = EditorView.baseTheme({
   },
 });
 
-const tabSize = new Compartment();
+//const tabSize = new Compartment();
 
 const u00b7 = '·'; // ラテン語中点
 const u2018 = '∘'; // RING OPERATOR
@@ -132,6 +118,7 @@ const state = EditorState.create({
     //tabSize.of(EditorState.tabSize.of(4)),
     EditorView.lineWrapping, // 改行
     //python(),
+    //cpp(),
     javascript(),
     //oneDark, // theme
     myTheme, // custom
@@ -145,7 +132,7 @@ const editor = new EditorView({
   parent: editorDiv,
 });
 
-// document.body.appendChild(undoDiv);
+
 undoDiv.addEventListener('click', () => {
   //console.log('hoge');
   undoDiv.style.background =
