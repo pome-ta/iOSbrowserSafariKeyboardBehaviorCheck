@@ -18,13 +18,13 @@ import {
   closeBracketsKeymap,
   completionKeymap,
 } from '@codemirror/autocomplete';
+import { undo, redo } from '@codemirror/commands';
 
 import { javascript } from '@codemirror/lang-javascript';
 //import { python } from '@codemirror/lang-python';
 
 import { oneDark } from '@codemirror/theme-one-dark';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
-
 
 const undoDiv = document.createElement('div');
 undoDiv.textContent = 'undo';
@@ -125,4 +125,13 @@ const state = EditorState.create({
 const editor = new EditorView({
   state,
   parent: editorDiv,
+});
+
+undoDiv.addEventListener('click', () => {
+  //console.log('hoge');
+  undoDiv.style.background =
+    undoDiv.style.background === 'red' ? 'blue' : 'red';
+
+  editor.focus();
+  undo(editor);
 });

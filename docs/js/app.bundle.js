@@ -21384,7 +21384,16 @@ const state = EditorState.create({
   ],
 });
 
-new EditorView({
+const editor = new EditorView({
   state,
   parent: editorDiv,
+});
+
+undoDiv.addEventListener('click', () => {
+  //console.log('hoge');
+  undoDiv.style.background =
+    undoDiv.style.background === 'red' ? 'blue' : 'red';
+
+  editor.focus();
+  undo(editor);
 });
