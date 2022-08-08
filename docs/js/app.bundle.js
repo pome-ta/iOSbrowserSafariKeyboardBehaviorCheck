@@ -17372,6 +17372,13 @@ const defaultKeymap = /*@__PURE__*/[
     { key: "Mod-/", run: toggleComment },
     { key: "Alt-A", run: toggleBlockComment }
 ].concat(standardKeymap);
+/**
+A binding that binds Tab to [`indentMore`](https://codemirror.net/6/docs/ref/#commands.indentMore) and
+Shift-Tab to [`indentLess`](https://codemirror.net/6/docs/ref/#commands.indentLess).
+Please see the [Tab example](../../examples/tab/) before using
+this.
+*/
+const indentWithTab = { key: "Tab", run: indentMore, shift: indentLess };
 
 const basicNormalize = typeof String.prototype.normalize == "function"
     ? x => x.normalize("NFKD") : x => x;
@@ -21296,18 +21303,36 @@ const autoCloseTags = /*@__PURE__*/EditorView.inputHandler.of((view, from, to, t
     return true;
 });
 
+const backDiv = document.createElement('div');
+backDiv.id = 'backWrap';
+backDiv.style.width = '100%';
+backDiv.style.height = '100%';
+backDiv.style.opacity = 0.5;
+// backDiv.style.position = 'sticky';
+backDiv.style.position = 'relative';
+// backDiv.style.top = 0;
+backDiv.style.zIndex = 1;
+
+// document.body.appendChild(backDiv);
+
 const undoDiv = document.createElement('div');
 undoDiv.textContent = 'undo';
 undoDiv.style.width = '100%';
 undoDiv.style.height = '4rem';
 undoDiv.style.background = 'red';
-document.body.appendChild(undoDiv);
 
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
 // editorDiv.style.backgroundColor = 'turquoise';
 // editorDiv.style.backgroundColor = '#232323';
 editorDiv.style.width = '100%';
+// editorDiv.style.position = 'absolute';
+// editorDiv.style.position = 'relative';
+// editorDiv.style.position = 'static';
+// editorDiv.style.position = 'sticky';
+// editorDiv.style.position = 'fixed';
+// editorDiv.style.zIndex = 2;
+// editorDiv.style.top = 0;
 //editorDiv.style.height = '100%';
 document.body.appendChild(editorDiv);
 
@@ -21315,23 +21340,23 @@ const codeSample = `function setupRangeToSectionInputValue(
   inputElement,
   textCaptionStr,
   unitCaptionStr = null
-) {
-  const textNodeCaption = document.createTextNode(textCaptionStr);
-  const inputValue = document.createElement('span');
-  const textNodeUnit =
+  ) {
+    const textNodeCaption = document.createTextNode(textCaptionStr);
+    const inputValue = document.createElement('span');
+    const textNodeUnit =
     unitCaptionStr !== null ? document.createTextNode(unitCaptionStr) : null;
-  const wrap = document.createElement('div');
-  wrap.style.width = '88%';
-  wrap.style.margin = 'auto';
-  const rangeSection = setAppendChild(
-    [textNodeCaption, inputValue, textNodeUnit, wrap, [inputElement]].filter(
-      (child) => child !== null
-    ),
-    createSection()
-  );
-  return [rangeSection, inputValue];
-}
-`;
+    const wrap = document.createElement('div');
+    wrap.style.width = '88%';
+    wrap.style.margin = 'auto';
+    const rangeSection = setAppendChild(
+      [textNodeCaption, inputValue, textNodeUnit, wrap, [inputElement]].filter(
+        (child) => child !== null
+        ),
+        createSection()
+        );
+        return [rangeSection, inputValue];
+      }
+      `;
 
 const myTheme = EditorView.baseTheme({
   '&.cm-editor': {
@@ -21371,7 +21396,7 @@ const state = EditorState.create({
     highlightSelectionMatches(),
     closeBrackets(),
     autocompletion(),
-    keymap.of([...closeBracketsKeymap, ...completionKeymap]),
+    keymap.of([...closeBracketsKeymap, ...completionKeymap, indentWithTab]),
     /* --- basicSetup */
     //tabSize.of(EditorState.tabSize.of(4)),
     EditorView.lineWrapping, // 改行
@@ -21379,7 +21404,7 @@ const state = EditorState.create({
     javascript(),
     //oneDark, // theme
     myTheme, // custom
-    //indentationMarkers(),
+    // indentationMarkers(),
     whitespaceShow,
   ],
 });
@@ -21389,6 +21414,7 @@ const editor = new EditorView({
   parent: editorDiv,
 });
 
+// document.body.appendChild(undoDiv);
 undoDiv.addEventListener('click', () => {
   //console.log('hoge');
   undoDiv.style.background =
