@@ -41,11 +41,19 @@ backDiv.style.zIndex = 1;
 
 const undoDiv = document.createElement('div');
 undoDiv.textContent = 'undo';
-undoDiv.style.width = '100%';
+undoDiv.style.width = '50%';
 undoDiv.style.height = '4rem';
 undoDiv.style.background = 'red';
 
 document.body.appendChild(undoDiv);
+
+const redoDiv = document.createElement('div');
+redoDiv.textContent = 'undo';
+redoDiv.style.width = '50%';
+redoDiv.style.height = '4rem';
+redoDiv.style.background = 'blue';
+
+document.body.appendChild(redoDiv);
 
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
@@ -138,6 +146,18 @@ undoDiv.addEventListener('click', () => {
   undoDiv.style.background =
     undoDiv.style.background === 'red' ? 'blue' : 'red';
 
-  editor.focus();
+  //editor.focus();
   undo(editor);
 });
+
+redoDiv.addEventListener('click', () => {
+  //console.log('hoge');
+  redoDiv.style.background =
+    redoDiv.style.background === 'red' ? 'blue' : 'red';
+
+  //editor.focus();
+  redo(editor);
+});
+
+
+
