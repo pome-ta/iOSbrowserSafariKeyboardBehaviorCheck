@@ -21317,15 +21317,15 @@ backDiv.style.zIndex = 1;
 
 const undoDiv = document.createElement('div');
 undoDiv.textContent = 'undo';
-undoDiv.style.width = '50%';
+undoDiv.style.width = '100%';
 undoDiv.style.height = '4rem';
 undoDiv.style.background = 'red';
 
 document.body.appendChild(undoDiv);
 
 const redoDiv = document.createElement('div');
-redoDiv.textContent = 'undo';
-redoDiv.style.width = '50%';
+redoDiv.textContent = 'redo';
+redoDiv.style.width = '100%';
 redoDiv.style.height = '4rem';
 redoDiv.style.background = 'blue';
 
