@@ -25,6 +25,8 @@ import { python } from '@codemirror/lang-python';
 import { cpp } from '@codemirror/lang-cpp';
 
 import { oneDark } from '@codemirror/theme-one-dark';
+import { myOneDark } from './theme-my-oneDark.js';
+
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 
 const undoDiv = document.createElement('div');
@@ -33,7 +35,7 @@ undoDiv.style.width = '100%';
 undoDiv.style.height = '4rem';
 undoDiv.style.background = 'red';
 
-// document.body.appendChild(undoDiv);
+//document.body.appendChild(undoDiv);
 
 const redoDiv = document.createElement('div');
 redoDiv.textContent = 'redo';
@@ -41,7 +43,7 @@ redoDiv.style.width = '100%';
 redoDiv.style.height = '4rem';
 redoDiv.style.background = 'blue';
 
-// document.body.appendChild(redoDiv);
+//document.body.appendChild(redoDiv);
 
 const backDiv = document.createElement('div');
 backDiv.id = 'backWrap';
@@ -93,7 +95,7 @@ editorDiv.style.position = 'relative';
 // editorDiv.style.position = 'fixed';
 editorDiv.style.zIndex = 2;
 editorDiv.style.top = 0;
-editorDiv.style.opacity = 0.5;
+//editorDiv.style.opacity = 0.5;
 
 document.body.appendChild(backDiv);
 document.body.appendChild(editorDiv);
@@ -152,15 +154,7 @@ function create_program(vs, fs) {
 }
 `;
 
-const myTheme = EditorView.baseTheme({
-  '&.cm-editor': {
-    fontSize: '0.8rem',
-  },
-  '.cm-scroller': {
-    fontFamily:
-      'Consolas, Menlo, Monaco, source-code-pro, Courier New, monospace',
-  },
-});
+
 
 //const tabSize = new Compartment();
 
@@ -173,15 +167,28 @@ const u22c5 = '⋅'; // DOT OPERATOR
 const u30fb = '・'; // 全角中点
 const uff65 = '･'; // 半角中点
 
+const ivory = '#abb2bf44'; // todo: oneDark から拝借
+const stone = '#7d8799'; // Brightened compared to original to increase contrast  // 濃い灰色
 const whitespaceShow = highlightSpecialChars({
   render: (code) => {
     let node = document.createElement('span');
-    node.style.opacity = 0.5;
+    node.classList.add('cm-whoteSpace');
+    // node.style.opacity = 0.5;
+    node.style.color = ivory;
+    // node.style.color = stone;
     node.innerText = u22c5;
+    // node.innerText = uff65;
     node.title = '\\u' + code.toString(16);
     return node;
   },
-  specialChars: /\x20/g,
+  // specialChars: /\x20/g,
+  addSpecialChars: /\x20/g,
+});
+
+const darkBackground = '#21252b44';
+const backgroundOpacity = EditorView.theme({
+  '.cm-line': { padding: 0 },
+  '.cm-line *': { backgroundColor: darkBackground },
 });
 
 const state = EditorState.create({
@@ -205,9 +212,10 @@ const state = EditorState.create({
     //python(),
     //cpp(),
     javascript(),
-    oneDark, // theme
-    myTheme, // custom
+    //oneDark, // theme
+    myOneDark, // theme
     // indentationMarkers(),
+    backgroundOpacity,
     whitespaceShow,
   ],
 });
@@ -218,6 +226,9 @@ const editor = new EditorView({
 });
 
 document.addEventListener('DOMContentLoaded', loadcanvas);
+
+
+window.addEventListener('resize', loadcanvas);
 
 /*
 undoDiv.addEventListener('click', () => {
