@@ -29,6 +29,17 @@ import { myOneDark } from './theme-my-oneDark.js';
 
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 
+
+
+const statusAreaDiv = document.createElement('div');
+statusAreaDiv.id = 'statusArea';
+statusAreaDiv.style.width = '100%';
+statusAreaDiv.style.height = '4rem';
+statusAreaDiv.style.background = 'green';
+
+
+
+
 const undoDiv = document.createElement('div');
 undoDiv.textContent = 'undo';
 undoDiv.style.width = '100%';
