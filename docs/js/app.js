@@ -35,10 +35,12 @@ statusAreaDiv.style.width = '100%';
 statusAreaDiv.style.height = '4rem';
 statusAreaDiv.style.background = 'green';
 //statusAreaDiv.style.position = 'absolute';
+
 statusAreaDiv.style.position = 'fixed';
 statusAreaDiv.style.bottom = 0;
 statusAreaDiv.style.zIndex = 3;
-document.body.appendChild(statusAreaDiv);
+
+//document.body.appendChild(statusAreaDiv);
 
 const undoDiv = document.createElement('div');
 undoDiv.textContent = 'undo';
@@ -98,6 +100,8 @@ editorDiv.id = 'editorWrap';
 // editorDiv.style.backgroundColor = 'turquoise';
 // editorDiv.style.backgroundColor = '#232323';
 editorDiv.style.width = '100%';
+editorDiv.style.display = 'flex';
+editorDiv.style.flexDirection='column'
 //editorDiv.style.height = '100%';
 // editorDiv.style.position = 'absolute';
 editorDiv.style.position = 'relative';
@@ -234,7 +238,7 @@ const editor = new EditorView({
   parent: editorDiv,
 });
 
-
+editorDiv.appendChild(statusAreaDiv);
 
 
 document.addEventListener('DOMContentLoaded', loadcanvas);
