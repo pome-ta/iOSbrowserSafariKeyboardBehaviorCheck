@@ -29,16 +29,16 @@ import { myOneDark } from './theme-my-oneDark.js';
 
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 
-
-
 const statusAreaDiv = document.createElement('div');
 statusAreaDiv.id = 'statusArea';
 statusAreaDiv.style.width = '100%';
 statusAreaDiv.style.height = '4rem';
 statusAreaDiv.style.background = 'green';
-
-
-
+//statusAreaDiv.style.position = 'absolute';
+statusAreaDiv.style.position = 'fixed';
+statusAreaDiv.style.bottom = 0;
+statusAreaDiv.style.zIndex = 3;
+document.body.appendChild(statusAreaDiv);
 
 const undoDiv = document.createElement('div');
 undoDiv.textContent = 'undo';
@@ -165,8 +165,6 @@ function create_program(vs, fs) {
 }
 `;
 
-
-
 //const tabSize = new Compartment();
 
 const u00b7 = '·'; // ラテン語中点
@@ -236,8 +234,10 @@ const editor = new EditorView({
   parent: editorDiv,
 });
 
-document.addEventListener('DOMContentLoaded', loadcanvas);
 
+
+
+document.addEventListener('DOMContentLoaded', loadcanvas);
 
 window.addEventListener('resize', loadcanvas);
 
@@ -260,4 +260,3 @@ redoDiv.addEventListener('click', () => {
   redo(editor);
 });
 */
-

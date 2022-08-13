@@ -21551,6 +21551,17 @@ the highlight style).
 */
 const myOneDark = [myOneDarkTheme, syntaxHighlighting(myOneDarkHighlightStyle)];
 
+const statusAreaDiv = document.createElement('div');
+statusAreaDiv.id = 'statusArea';
+statusAreaDiv.style.width = '100%';
+statusAreaDiv.style.height = '4rem';
+statusAreaDiv.style.background = 'green';
+//statusAreaDiv.style.position = 'absolute';
+statusAreaDiv.style.position = 'fixed';
+statusAreaDiv.style.bottom = 0;
+statusAreaDiv.style.zIndex = 3;
+document.body.appendChild(statusAreaDiv);
+
 const undoDiv = document.createElement('div');
 undoDiv.textContent = 'undo';
 undoDiv.style.width = '100%';
@@ -21734,8 +21745,10 @@ new EditorView({
   parent: editorDiv,
 });
 
-document.addEventListener('DOMContentLoaded', loadcanvas);
 
+
+
+document.addEventListener('DOMContentLoaded', loadcanvas);
 
 window.addEventListener('resize', loadcanvas);
 
