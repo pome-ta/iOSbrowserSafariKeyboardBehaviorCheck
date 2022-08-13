@@ -21613,7 +21613,12 @@ function loadcanvas() {
   ctx.moveTo(w, 0);
   ctx.lineTo(0, h);
   ctx.stroke();
-  //console.log(window.visualViewport.height)
+  console.log('visualViewport');
+  console.log(window.visualViewport.height);
+  console.log('innerHeight');
+  console.log(window.innerHeight);
+  console.log('clientHeight');
+  console.log(document.body.clientHeight);
 }
 
 backDiv.appendChild(myCanvas);
@@ -21624,7 +21629,7 @@ editorDiv.id = 'editorWrap';
 // editorDiv.style.backgroundColor = '#232323';
 editorDiv.style.width = '100%';
 editorDiv.style.display = 'flex';
-editorDiv.style.flexDirection='column';
+editorDiv.style.flexDirection = 'column';
 //editorDiv.style.height = '100%';
 // editorDiv.style.position = 'absolute';
 editorDiv.style.position = 'relative';
@@ -21751,7 +21756,6 @@ new EditorView({
 });
 
 editorDiv.appendChild(statusAreaDiv);
-
 
 document.addEventListener('DOMContentLoaded', loadcanvas);
 
