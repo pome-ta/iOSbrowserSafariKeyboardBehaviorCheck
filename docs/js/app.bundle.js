@@ -21613,6 +21613,7 @@ function loadcanvas() {
   ctx.moveTo(w, 0);
   ctx.lineTo(0, h);
   ctx.stroke();
+  //console.log(window.visualViewport.height)
 }
 
 backDiv.appendChild(myCanvas);
