@@ -252,3 +252,4 @@ the highlight style).
 const myOneDark = [myOneDarkTheme, syntaxHighlighting(myOneDarkHighlightStyle)];
 
 export { myOneDark, myOneDarkHighlightStyle, myOneDarkTheme };
+

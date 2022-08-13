@@ -21551,131 +21551,53 @@ the highlight style).
 */
 const myOneDark = [myOneDarkTheme, syntaxHighlighting(myOneDarkHighlightStyle)];
 
-const statusAreaDiv = document.createElement('div');
-statusAreaDiv.id = 'statusArea';
-statusAreaDiv.style.width = '100%';
-statusAreaDiv.style.height = '4rem';
-statusAreaDiv.style.background = 'green';
-//statusAreaDiv.style.position = 'absolute';
+document.body.style.backgroundColor = '#232323';
 
-statusAreaDiv.style.position = 'fixed';
-statusAreaDiv.style.bottom = 0;
-statusAreaDiv.style.zIndex = 3;
+const operationDiv = document.createElement('div');
+operationDiv.id = 'operationWrap';
+operationDiv.style.width = '100%';
+operationDiv.style.height = '4rem';
+operationDiv.style.backgroundColor = 'turquoise';
+operationDiv.style.display = 'flex';
 
-//document.body.appendChild(statusAreaDiv);
+document.body.appendChild(operationDiv);
 
-const undoDiv = document.createElement('div');
-undoDiv.textContent = 'undo';
-undoDiv.style.width = '100%';
-undoDiv.style.height = '4rem';
-undoDiv.style.background = 'red';
-
-//document.body.appendChild(undoDiv);
+const selectAllDiv = document.createElement('div');
+selectAllDiv.id = 'selectAllWrap';
+selectAllDiv.textContent = 'select all';
+selectAllDiv.style.width = '4rem';
+selectAllDiv.style.height = '100%';
+selectAllDiv.style.borderRadius = '16%';
+selectAllDiv.style.backgroundColor = '#ababab';
 
 const redoDiv = document.createElement('div');
+redoDiv.id = 'redoWrap';
 redoDiv.textContent = 'redo';
-redoDiv.style.width = '100%';
-redoDiv.style.height = '4rem';
-redoDiv.style.background = 'blue';
+redoDiv.style.width = '4rem';
+redoDiv.style.height = '100%';
+redoDiv.style.borderRadius = '16%';
+redoDiv.style.backgroundColor = '#ababab';
 
-//document.body.appendChild(redoDiv);
+const undoDiv = document.createElement('div');
+undoDiv.id = 'undoWrap';
+undoDiv.textContent = 'undo';
+undoDiv.style.width = '4rem';
+undoDiv.style.height = '100%';
+undoDiv.style.borderRadius = '16%';
+undoDiv.style.backgroundColor = '#ababab';
 
-const backDiv = document.createElement('div');
-backDiv.id = 'backWrap';
-backDiv.style.width = '100%';
-// backDiv.style.height = '900px';
-backDiv.style.height = '100%';
-// backDiv.style.background = 'blue';
-// backDiv.style.opacity = 0.5;
-// backDiv.style.position = 'sticky';
-// backDiv.style.position = 'relative';
-// backDiv.style.position = 'static';
-backDiv.style.position = 'fixed';
-backDiv.style.top = 0;
-backDiv.style.left = 0;
-backDiv.style.zIndex = 1;
-
-const myCanvas = document.createElement('canvas');
-
-function loadcanvas() {
-  const w = backDiv.clientWidth;
-  const h = backDiv.clientHeight;
-  myCanvas.width = w;
-  myCanvas.height = h;
-  // const {width : w, height : h} =  myCanvas;
-  const ctx = myCanvas.getContext('2d');
-  ctx.fillStyle = 'maroon';
-  ctx.fillRect(0, 0, w, h);
-  ctx.beginPath();
-  ctx.strokeStyle = 'blue';
-  ctx.moveTo(0, 0);
-  ctx.lineTo(w, h);
-  ctx.moveTo(w, 0);
-  ctx.lineTo(0, h);
-  ctx.stroke();
-  console.log('visualViewport');
-  console.log(window.visualViewport.height);
-  console.log('innerHeight');
-  console.log(window.innerHeight);
-  console.log('clientHeight');
-  console.log(document.body.clientHeight);
-}
-
-backDiv.appendChild(myCanvas);
+operationDiv.appendChild(selectAllDiv);
+operationDiv.appendChild(redoDiv);
+operationDiv.appendChild(undoDiv);
 
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
 // editorDiv.style.backgroundColor = 'turquoise';
-// editorDiv.style.backgroundColor = '#232323';
 editorDiv.style.width = '100%';
-editorDiv.style.display = 'flex';
-editorDiv.style.flexDirection = 'column';
-//editorDiv.style.height = '100%';
-// editorDiv.style.position = 'absolute';
-editorDiv.style.position = 'relative';
-// editorDiv.style.position = 'static';
-// editorDiv.style.position = 'sticky';
-// editorDiv.style.position = 'fixed';
-editorDiv.style.zIndex = 2;
-editorDiv.style.top = 0;
-//editorDiv.style.opacity = 0.5;
 
-document.body.appendChild(backDiv);
 document.body.appendChild(editorDiv);
 
-const codeSample = `// シェーダを生成する関数
-function create_shader(type, text) {
-  let shader;
-  // scriptタグのtype属性をチェック
-  switch (type) {
-    // 頂点シェーダの場合
-    case 'vs':
-      shader = gl.createShader(gl.VERTEX_SHADER);
-      break;
-    // フラグメントシェーダの場合
-    case 'fs':
-      shader = gl.createShader(gl.FRAGMENT_SHADER);
-      break;
-    default:
-      return;
-  }
-
-  // 生成されたシェーダにソースを割り当てる
-  gl.shaderSource(shader, text);
-  // シェーダをコンパイルする
-  gl.compileShader(shader);
-  // シェーダが正しくコンパイルされたかチェック
-  if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    // 成功していたらシェーダを返して終了
-    return shader;
-  } else {
-    // 失敗していたらエラーログをアラートしコンソールに出力
-    // alert(gl.getShaderInfoLog(shader));
-    console.log(gl.getShaderInfoLog(shader));
-  }
-}
-
-// プログラムオブジェクトを生成しシェーダをリンクする関数
+const codeSample = `// プログラムオブジェクトを生成しシェーダをリンクする関数
 function create_program(vs, fs) {
   // プログラムオブジェクトの生成
   const program = gl.createProgram();
@@ -21696,6 +21618,8 @@ function create_program(vs, fs) {
   }
 }
 `;
+
+const tabSize = new Compartment();
 const u22c5 = '⋅'; // DOT OPERATOR
 
 const ivory = '#abb2bf44'; // todo: oneDark から拝借
@@ -21737,7 +21661,8 @@ const state = EditorState.create({
     autocompletion(),
     keymap.of([...closeBracketsKeymap, ...completionKeymap, indentWithTab]),
     /* --- basicSetup */
-    //tabSize.of(EditorState.tabSize.of(4)),
+    //
+    tabSize.of(EditorState.tabSize.of(2)),
     EditorView.lineWrapping, // 改行
     //python(),
     //cpp(),
@@ -21754,29 +21679,3 @@ new EditorView({
   state,
   parent: editorDiv,
 });
-
-editorDiv.appendChild(statusAreaDiv);
-
-document.addEventListener('DOMContentLoaded', loadcanvas);
-
-window.addEventListener('resize', loadcanvas);
-
-/*
-undoDiv.addEventListener('click', () => {
-  //console.log('hoge');
-  undoDiv.style.background =
-    undoDiv.style.background === 'red' ? 'blue' : 'red';
-
-  //editor.focus();
-  undo(editor);
-});
-
-redoDiv.addEventListener('click', () => {
-  //console.log('hoge');
-  redoDiv.style.background =
-    redoDiv.style.background === 'red' ? 'blue' : 'red';
-
-  //editor.focus();
-  redo(editor);
-});
-*/
