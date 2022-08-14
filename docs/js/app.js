@@ -34,7 +34,7 @@ document.body.style.backgroundColor = '#232323';
 const operationDiv = document.createElement('div');
 operationDiv.id = 'operationWrap';
 operationDiv.style.width = '100%';
-operationDiv.style.height = '4rem';
+operationDiv.style.height = '3rem';
 operationDiv.style.backgroundColor = 'turquoise';
 operationDiv.style.display = 'flex';
 
