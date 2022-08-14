@@ -38,7 +38,7 @@ operationDiv.style.height = '2rem';
 operationDiv.style.padding = '0.25rem';
 operationDiv.style.backgroundColor = 'turquoise';
 operationDiv.style.display = 'flex';
-operationDiv.style.alignItems='center';
+operationDiv.style.alignItems = 'center';
 
 document.body.appendChild(operationDiv);
 
