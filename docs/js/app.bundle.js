@@ -21556,25 +21556,28 @@ document.body.style.backgroundColor = '#232323';
 const operationDiv = document.createElement('div');
 operationDiv.id = 'operationWrap';
 operationDiv.style.width = '100%';
-operationDiv.style.height = '3rem';
+operationDiv.style.height = '2rem';
+operationDiv.style.padding = '0.25rem';
 operationDiv.style.backgroundColor = 'turquoise';
 operationDiv.style.display = 'flex';
+operationDiv.style.alignItems='center';
 
 document.body.appendChild(operationDiv);
 
-const btnW = '4rem';
+const btnW = '2rem';
 const btnRadius = '8%';
 
 const logAreaDiv = document.createElement('div');
 logAreaDiv.id = 'logAreaWrap';
 logAreaDiv.textContent = 'log area & move caret';
+logAreaDiv.style.flexGrow = '1';
 logAreaDiv.style.height = '100%';
 logAreaDiv.style.borderRadius = btnRadius;
 logAreaDiv.style.backgroundColor = '#bcbcbc';
 
 const selectAllDiv = document.createElement('div');
 selectAllDiv.id = 'selectAllWrap';
-selectAllDiv.textContent = 'select all';
+//selectAllDiv.textContent = 'select all';
 selectAllDiv.style.width = btnW;
 selectAllDiv.style.height = '100%';
 selectAllDiv.style.borderRadius = btnRadius;
@@ -21582,7 +21585,7 @@ selectAllDiv.style.backgroundColor = '#ababab';
 
 const redoDiv = document.createElement('div');
 redoDiv.id = 'redoWrap';
-redoDiv.textContent = 'redo';
+//redoDiv.textContent = 'redo';
 redoDiv.style.width = btnW;
 redoDiv.style.height = '100%';
 redoDiv.style.borderRadius = btnRadius;
@@ -21590,7 +21593,7 @@ redoDiv.style.backgroundColor = '#ababab';
 
 const undoDiv = document.createElement('div');
 undoDiv.id = 'undoWrap';
-undoDiv.textContent = 'undo';
+//undoDiv.textContent = 'undo';
 undoDiv.style.width = btnW;
 undoDiv.style.height = '100%';
 undoDiv.style.borderRadius = btnRadius;
