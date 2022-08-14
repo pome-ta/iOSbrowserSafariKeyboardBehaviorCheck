@@ -21708,3 +21708,7 @@ undoDiv.addEventListener('click', () => {
 redoDiv.addEventListener('click', () => {
   redo(editor);
 });
+
+selectAllDiv.addEventListener('click', () => {
+  console.log(editor);
+});

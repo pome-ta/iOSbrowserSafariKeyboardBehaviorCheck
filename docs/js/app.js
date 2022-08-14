@@ -21,8 +21,6 @@ import {
 import { undo, redo, indentWithTab } from '@codemirror/commands';
 
 import { javascript } from '@codemirror/lang-javascript';
-// import { python } from '@codemirror/lang-python';
-// import { cpp } from '@codemirror/lang-cpp';
 
 import { oneDark } from '@codemirror/theme-one-dark';
 import { myOneDark } from './theme-my-oneDark.js';
@@ -195,4 +193,8 @@ undoDiv.addEventListener('click', () => {
 
 redoDiv.addEventListener('click', () => {
   redo(editor);
+});
+
+selectAllDiv.addEventListener('click', () => {
+  console.log(editor);
 });
