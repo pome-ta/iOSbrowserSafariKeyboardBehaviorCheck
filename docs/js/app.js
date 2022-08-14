@@ -21,8 +21,8 @@ import {
 import { undo, redo, indentWithTab } from '@codemirror/commands';
 
 import { javascript } from '@codemirror/lang-javascript';
-import { python } from '@codemirror/lang-python';
-import { cpp } from '@codemirror/lang-cpp';
+// import { python } from '@codemirror/lang-python';
+// import { cpp } from '@codemirror/lang-cpp';
 
 import { oneDark } from '@codemirror/theme-one-dark';
 import { myOneDark } from './theme-my-oneDark.js';
@@ -34,7 +34,7 @@ document.body.style.backgroundColor = '#232323';
 const operationDiv = document.createElement('div');
 operationDiv.id = 'operationWrap';
 operationDiv.style.width = '100%';
-operationDiv.style.height = '2rem';
+operationDiv.style.height = '3rem';
 operationDiv.style.padding = '0.25rem';
 operationDiv.style.backgroundColor = 'turquoise';
 operationDiv.style.display = 'flex';
@@ -50,31 +50,41 @@ logAreaDiv.id = 'logAreaWrap';
 logAreaDiv.textContent = 'log area & move caret';
 logAreaDiv.style.flexGrow = '1';
 logAreaDiv.style.height = '100%';
-logAreaDiv.style.borderRadius = btnRadius;
+logAreaDiv.style.border = '1px solid';
+// logAreaDiv.style.borderRadius = btnRadius;
 logAreaDiv.style.backgroundColor = '#bcbcbc';
 
 const selectAllDiv = document.createElement('div');
 selectAllDiv.id = 'selectAllWrap';
-//selectAllDiv.textContent = 'select all';
+selectAllDiv.textContent = '⎁';
+selectAllDiv.style.textAlign = 'center';
+// selectAllDiv.textContent = 'select all';
 selectAllDiv.style.width = btnW;
 selectAllDiv.style.height = '100%';
-selectAllDiv.style.borderRadius = btnRadius;
+selectAllDiv.style.border = '1px solid';
+// selectAllDiv.style.borderRadius = btnRadius;
 selectAllDiv.style.backgroundColor = '#ababab';
 
 const redoDiv = document.createElement('div');
 redoDiv.id = 'redoWrap';
 //redoDiv.textContent = 'redo';
+redoDiv.textContent = '↪';
+redoDiv.style.textAlign = 'center';
 redoDiv.style.width = btnW;
 redoDiv.style.height = '100%';
-redoDiv.style.borderRadius = btnRadius;
+redoDiv.style.border = '1px solid';
+// redoDiv.style.borderRadius = btnRadius;
 redoDiv.style.backgroundColor = '#ababab';
 
 const undoDiv = document.createElement('div');
 undoDiv.id = 'undoWrap';
 //undoDiv.textContent = 'undo';
+undoDiv.textContent = '⎌';
+undoDiv.style.textAlign = 'center';
 undoDiv.style.width = btnW;
 undoDiv.style.height = '100%';
-undoDiv.style.borderRadius = btnRadius;
+undoDiv.style.border = '1px solid';
+// undoDiv.style.borderRadius = btnRadius;
 undoDiv.style.backgroundColor = '#ababab';
 
 operationDiv.appendChild(logAreaDiv);
@@ -165,8 +175,6 @@ const state = EditorState.create({
     //
     tabSize.of(EditorState.tabSize.of(2)),
     EditorView.lineWrapping, // 改行
-    //python(),
-    //cpp(),
     javascript(),
     //oneDark, // theme
     myOneDark, // theme
@@ -179,4 +187,12 @@ const state = EditorState.create({
 const editor = new EditorView({
   state,
   parent: editorDiv,
+});
+
+undoDiv.addEventListener('click', () => {
+  undo(editor);
+});
+
+redoDiv.addEventListener('click', () => {
+  redo(editor);
 });
