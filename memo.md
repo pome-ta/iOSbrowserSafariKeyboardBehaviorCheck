@@ -2,6 +2,10 @@
 
 `div` の中に、もう一度`div` をつっこむ予定
 
+[Getting Started - simple-keyboard - Francisco Hodge](https://hodgef.com/simple-keyboard/getting-started/)
+
+Keyboard 偽装いけるか？
+
 # 📝 2022/08/13
 
 iOS safari のsoft Keyboard レイアウト

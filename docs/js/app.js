@@ -1,7 +1,7 @@
 import { EditorView } from 'codemirror';
 import { basicSetup, minimalSetup } from 'codemirror';
 
-import { EditorState, Compartment } from '@codemirror/state';
+import { EditorState, EditorSelection, Compartment } from '@codemirror/state';
 import {
   lineNumbers,
   highlightActiveLineGutter,
@@ -196,5 +196,29 @@ redoDiv.addEventListener('click', () => {
 });
 
 selectAllDiv.addEventListener('click', () => {
-  console.log(editor);
+  let last = editor.state.doc.length;
+  //let transaction = editor.state.update({ changes: { from: 0, insert: '0' } });
+  /*
+  let transaction = editor.state.update({
+  selection: EditorSelection.create([
+    EditorSelection.range(4, 5),
+    EditorSelection.range(6, 7),
+    EditorSelection.cursor(8)
+  ], 1)
+});*/
+  //console.log(transaction.state.doc.toString()) // '0123'
+  // At this point the view still shows the old state.
+  let transaction = {
+    changes: { from: last, insert: '*' },
+    //selection: {anchor: 11}
+  };
+  editor.dispatch(transaction);
+  /*
+  editor.dispatch({
+  selection: EditorSelection.create([
+    EditorSelection.range(4, 5),
+    EditorSelection.range(6, 7),
+    EditorSelection.cursor(8)
+  ], 1)
+})*/
 });
