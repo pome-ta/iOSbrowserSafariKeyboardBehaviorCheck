@@ -217,6 +217,7 @@ selectAllDiv.addEventListener('click', () => {
     //selection: {anchor: 11}
   };
   editor.dispatch(transaction);
+  editor.focus();
   /*
   editor.dispatch({
   selection: EditorSelection.create([
