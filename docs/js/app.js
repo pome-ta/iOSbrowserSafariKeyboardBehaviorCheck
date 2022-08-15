@@ -196,34 +196,10 @@ redoDiv.addEventListener('click', () => {
 });
 
 selectAllDiv.addEventListener('click', () => {
-  let last = editor.state.doc.length;
-  //let transaction = editor.state.update({ changes: { from: 0, insert: '0' } });
-  /*
-  let transaction = editor.state.update({
-  selection: EditorSelection.create([
-    EditorSelection.range(4, 5),
-    EditorSelection.range(6, 7),
-    EditorSelection.cursor(8)
-  ], 1)
-});*/
-  //console.log(transaction.state.doc.toString()) // '0123'
-  // At this point the view still shows the old state.
-  let transaction = {
-    selection: EditorSelection.create([
-      EditorSelection.range(0, last),
-      //EditorSelection.cursor(8),
-    ]),
-
-    //selection: {anchor: 11}
+  const endRange = editor.state.doc.length;
+  const transaction = {
+    selection: EditorSelection.create([EditorSelection.range(0, endRange)]),
   };
   editor.dispatch(transaction);
   editor.focus();
-  /*
-  editor.dispatch({
-  selection: EditorSelection.create([
-    EditorSelection.range(4, 5),
-    EditorSelection.range(6, 7),
-    EditorSelection.cursor(8)
-  ], 1)
-})*/
 });
