@@ -209,7 +209,11 @@ selectAllDiv.addEventListener('click', () => {
   //console.log(transaction.state.doc.toString()) // '0123'
   // At this point the view still shows the old state.
   let transaction = {
-    changes: { from: last, insert: '*' },
+    selection: EditorSelection.create([
+      EditorSelection.range(0, last),
+      //EditorSelection.cursor(8),
+    ]),
+
     //selection: {anchor: 11}
   };
   editor.dispatch(transaction);
