@@ -54,7 +54,8 @@ logAreaDiv.style.backgroundColor = '#bcbcbc';
 
 const selectAllDiv = document.createElement('div');
 selectAllDiv.id = 'selectAllWrap';
-selectAllDiv.textContent = '⎁';
+//selectAllDiv.textContent = '⎁';
+selectAllDiv.textContent = 'A';
 selectAllDiv.style.textAlign = 'center';
 // selectAllDiv.textContent = 'select all';
 selectAllDiv.style.width = btnW;
@@ -66,7 +67,8 @@ selectAllDiv.style.backgroundColor = '#ababab';
 const redoDiv = document.createElement('div');
 redoDiv.id = 'redoWrap';
 //redoDiv.textContent = 'redo';
-redoDiv.textContent = '↪';
+//redoDiv.textContent = '↪';
+redoDiv.textContent = 'R';
 redoDiv.style.textAlign = 'center';
 redoDiv.style.width = btnW;
 redoDiv.style.height = '100%';
@@ -77,7 +79,8 @@ redoDiv.style.backgroundColor = '#ababab';
 const undoDiv = document.createElement('div');
 undoDiv.id = 'undoWrap';
 //undoDiv.textContent = 'undo';
-undoDiv.textContent = '⎌';
+//undoDiv.textContent = '⎌';
+undoDiv.textContent = 'U';
 undoDiv.style.textAlign = 'center';
 undoDiv.style.width = btnW;
 undoDiv.style.height = '100%';
@@ -204,7 +207,6 @@ selectAllDiv.addEventListener('click', () => {
   editor.focus();
 });
 
-
 // todo: MouseEvent TouchEvent wrapper
 const { touchBegan, touchMoved, touchEnded } = {
   touchBegan:
@@ -215,9 +217,35 @@ const { touchBegan, touchMoved, touchEnded } = {
     typeof document.ontouchend !== 'undefined' ? 'touchend' : 'mouseup',
 };
 
+let caret = 0;
+let startX = 0;
+let endX = 0;
+function logAreaSwipeStart(event) {
+  caret = editor.state.selection.main.anchor;
+  startX = event.touches[0].pageX;
+}
+
+function logAreaSwipeMove(event) {
+  event.preventDefault();
+  endX = event.touches[0].pageX;
+  const moveDistance = Math.round((endX - startX) / 8);
+  //startX = endX
+  caret += moveDistance;
+  logAreaDiv.textContent = `${caret}: ${moveDistance}`;
+  editor.dispatch({
+    selection: EditorSelection.create([EditorSelection.cursor(caret)]),
+  });
+  editor.focus();
+}
+
+logAreaDiv.addEventListener(touchBegan, logAreaSwipeStart);
+
+logAreaDiv.addEventListener(touchMoved, logAreaSwipeMove);
+
+/*
 logAreaDiv.addEventListener(touchBegan, (e) => {
 //logAreaDiv.addEventListener('click', (e) => {
-  let caret = editor.state.selection.main.anchor;
+  caret = editor.state.selection.main.anchor;
   // editor.dispatch({
   //   selection: { anchor: ++caret },
   // });
@@ -229,7 +257,6 @@ logAreaDiv.addEventListener(touchBegan, (e) => {
 });
 
 logAreaDiv.addEventListener(touchMoved, () => {
-  
   event.preventDefault();
 });
 
@@ -238,4 +265,4 @@ logAreaDiv.addEventListener(touchEnded, () => {
   editor.focus();
 });
 
-
+*/
