@@ -174,10 +174,10 @@ const state = EditorState.create({
     tabSize.of(EditorState.tabSize.of(2)),
     EditorView.lineWrapping, // 改行
     javascript(),
-    //oneDark, // theme
-    myOneDark, // theme
+    oneDark, // theme
+    // myOneDark, // theme
     // indentationMarkers(),
-    backgroundOpacity,
+    // backgroundOpacity,
     whitespaceShow,
   ],
 });
@@ -203,3 +203,39 @@ selectAllDiv.addEventListener('click', () => {
   editor.dispatch(transaction);
   editor.focus();
 });
+
+
+// todo: MouseEvent TouchEvent wrapper
+const { touchBegan, touchMoved, touchEnded } = {
+  touchBegan:
+    typeof document.ontouchstart !== 'undefined' ? 'touchstart' : 'mousedown',
+  touchMoved:
+    typeof document.ontouchmove !== 'undefined' ? 'touchmove' : 'mousemove',
+  touchEnded:
+    typeof document.ontouchend !== 'undefined' ? 'touchend' : 'mouseup',
+};
+
+logAreaDiv.addEventListener(touchBegan, (e) => {
+//logAreaDiv.addEventListener('click', (e) => {
+  let caret = editor.state.selection.main.anchor;
+  // editor.dispatch({
+  //   selection: { anchor: ++caret },
+  // });
+  // editor.focus();
+  editor.dispatch({
+    selection: EditorSelection.create([EditorSelection.cursor(++caret)]),
+  });
+  //editor.focus();
+});
+
+logAreaDiv.addEventListener(touchMoved, () => {
+  
+  event.preventDefault();
+});
+
+
+logAreaDiv.addEventListener(touchEnded, () => {
+  editor.focus();
+});
+
+
