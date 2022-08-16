@@ -11,16 +11,16 @@ document.body.style.backgroundColor = '#232323';
 const operationDiv = document.createElement('div');
 operationDiv.id = 'operationWrap';
 operationDiv.style.width = '100%';
-operationDiv.style.height = '3rem';
-operationDiv.style.padding = '0.25rem';
+operationDiv.style.height = '4rem';
+//operationDiv.style.padding = '0.25rem';
 operationDiv.style.backgroundColor = 'turquoise';
 operationDiv.style.display = 'flex';
 operationDiv.style.alignItems = 'center';
 
 document.body.appendChild(operationDiv);
 
-const btnW = '2rem';
-const btnRadius = '8%';
+const btnW = '3rem';
+const btnRadius = '16%';
 
 const logAreaDiv = document.createElement('div');
 logAreaDiv.id = 'logAreaWrap';
@@ -59,13 +59,26 @@ const undoDiv = document.createElement('div');
 undoDiv.id = 'undoWrap';
 //undoDiv.textContent = 'undo';
 //undoDiv.textContent = '⎌';
-undoDiv.textContent = 'U';
+//undoDiv.textContent = 'U';
 undoDiv.style.textAlign = 'center';
 undoDiv.style.width = btnW;
 undoDiv.style.height = '100%';
 undoDiv.style.border = '1px solid';
 // undoDiv.style.borderRadius = btnRadius;
-undoDiv.style.backgroundColor = '#ababab';
+//undoDiv.style.backgroundColor = '#ababab';
+
+
+const undoButton = document.createElement('div');
+undoButton.id = 'undoBtn'
+undoButton.textContent = 'Und00';
+undoButton.style.width = '90%';
+undoButton.style.height = '100%';
+undoButton.style.borderRadius = btnRadius;
+undoButton.style.backgroundColor = 'red';
+undoButton.style.margin = '0 auto'
+//undoButton.style.padding = '1rem';
+undoDiv.appendChild(undoButton)
+
 
 operationDiv.appendChild(logAreaDiv);
 operationDiv.appendChild(selectAllDiv);
