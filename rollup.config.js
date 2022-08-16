@@ -3,7 +3,7 @@ export default {
   input: './docs/js/app.js',
   output: {
     file: './docs/js/app.bundle.js',
-    format: 'esm',
+    format: 'es',
   },
   plugins: [nodeResolve()],
 };
