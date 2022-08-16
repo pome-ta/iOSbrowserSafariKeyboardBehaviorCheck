@@ -138,6 +138,37 @@ undoIcon.style.color = '#fefefe';
 undoButton.appendChild(undoIcon);
 undoDiv.appendChild(undoButton);
 /* --- undo */
+
+function _createButtonWrap(width, height) {
+  const wrap = document.createElement('div');
+  wrap.style.width = width;
+  wrap.style.height = height;
+  wrap.style.display = 'flex';
+  wrap.style.justifyContent = 'center';
+  wrap.style.alignItems = 'center';
+  return wrap;
+}
+
+function createIcon(char) {
+  const icon = document.createElement('span');
+  icon.textContent = char;
+  icon.style.fontSize = '2rem';
+  icon.style.fontWeight = 900;
+  icon.style.color = '#fefefe';
+  return icon;
+}
+
+function createActionButton(iconChar) {
+  const icon = createIcon(iconChar);
+  const wrap = _createButtonWarap(btnW, '100%');
+  const button = _createButtonWarap('90%', '90%');
+  button.style.borderRadius = btnRadius;
+  button.style.backgroundColor = '#ababab';
+  button.appendChild(icon);
+  wrap.appendChild(button);
+  return wrap;
+}
+
 operationDiv.appendChild(logAreaDiv);
 operationDiv.appendChild(selectAllDiv);
 operationDiv.appendChild(redoDiv);
@@ -201,4 +232,3 @@ function logAreaSwipeMove(event) {
 logAreaDiv.addEventListener(touchBegan, logAreaSwipeStart);
 
 logAreaDiv.addEventListener(touchMoved, logAreaSwipeMove);
-
