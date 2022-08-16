@@ -11,7 +11,7 @@ import {
 const operationDiv = document.createElement('div');
 operationDiv.id = 'operationWrap';
 operationDiv.style.width = '100%';
-operationDiv.style.height = '2rem';
+operationDiv.style.height = '2.5rem';
 //operationDiv.style.padding = '0.25rem';
 operationDiv.style.backgroundColor = 'turquoise';
 operationDiv.style.display = 'flex';
@@ -91,8 +91,8 @@ redoButton.style.justifyContent = 'center';
 redoButton.style.alignItems = 'center';
 
 const redoIcon = document.createElement('span');
-redoIcon.textContent = '⭮';
-redoIcon.style.transform = `rotate(${90}deg)`;
+redoIcon.textContent = '⤻';
+//redoIcon.style.transform = `rotate(${90}deg)`;
 redoButton.appendChild(redoIcon);
 redoDiv.appendChild(redoButton);
 /* --- redo */
@@ -117,7 +117,7 @@ undoDiv.style.alignItems = 'center';
 const undoButton = document.createElement('div');
 undoButton.id = 'undoBtn';
 // undoButton.textContent = 'Un';
-undoButton.style.width = '80%';
+undoButton.style.width = '90%';
 undoButton.style.height = '90%';
 undoButton.style.borderRadius = btnRadius;
 undoButton.style.backgroundColor = '#ababab';
@@ -128,10 +128,13 @@ undoButton.style.justifyContent = 'center';
 undoButton.style.alignItems = 'center';
 
 const undoIcon = document.createElement('span');
-undoIcon.textContent = '⭯';
+undoIcon.textContent = '⤺';
+undoIcon.style.fontSize = '2rem';
 undoIcon.style.fontWeight = 900;
 undoIcon.style.color = '#fefefe';
-undoIcon.style.transform = `rotate(${-90}deg)`;
+//undoIcon.style.transform = `rotate(${-90}deg)`;
+//undoIcon.style.display = 'inline-block'
+//undoIcon.style.verticalAlign = 'top'
 undoButton.appendChild(undoIcon);
 undoDiv.appendChild(undoButton);
 /* --- undo */
