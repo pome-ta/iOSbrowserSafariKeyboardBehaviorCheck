@@ -26,7 +26,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { myOneDark } from './theme-my-oneDark.js';
 
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
-
+/*
 document.body.style.backgroundColor = '#232323';
 
 const operationDiv = document.createElement('div');
@@ -92,13 +92,13 @@ operationDiv.appendChild(logAreaDiv);
 operationDiv.appendChild(selectAllDiv);
 operationDiv.appendChild(redoDiv);
 operationDiv.appendChild(undoDiv);
-
+*/
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
 // editorDiv.style.backgroundColor = 'turquoise';
 editorDiv.style.width = '100%';
 
-document.body.appendChild(editorDiv);
+//document.body.appendChild(editorDiv);
 
 const codeSample = `// プログラムオブジェクトを生成しシェーダをリンクする関数
 function create_program(vs, fs) {
@@ -190,6 +190,10 @@ const editor = new EditorView({
   parent: editorDiv,
 });
 
+
+
+export {editor, editorDiv, undo, redo, EditorSelection};
+/*
 undoDiv.addEventListener('click', () => {
   undo(editor);
 });
@@ -242,7 +246,7 @@ function logAreaSwipeMove(event) {
 logAreaDiv.addEventListener(touchBegan, logAreaSwipeStart);
 
 logAreaDiv.addEventListener(touchMoved, logAreaSwipeMove);
-
+*/
 /*
 logAreaDiv.addEventListener(touchBegan, (e) => {
 //logAreaDiv.addEventListener('click', (e) => {

@@ -21660,6 +21660,7 @@ the highlight style).
 */
 [myOneDarkTheme, syntaxHighlighting(myOneDarkHighlightStyle)];
 
+/*
 document.body.style.backgroundColor = '#232323';
 
 const operationDiv = document.createElement('div');
@@ -21674,6 +21675,7 @@ operationDiv.style.alignItems = 'center';
 document.body.appendChild(operationDiv);
 
 const btnW = '2rem';
+const btnRadius = '8%';
 
 const logAreaDiv = document.createElement('div');
 logAreaDiv.id = 'logAreaWrap';
@@ -21724,13 +21726,13 @@ operationDiv.appendChild(logAreaDiv);
 operationDiv.appendChild(selectAllDiv);
 operationDiv.appendChild(redoDiv);
 operationDiv.appendChild(undoDiv);
-
+*/
 const editorDiv = document.createElement('div');
 editorDiv.id = 'editorWrap';
 // editorDiv.style.backgroundColor = 'turquoise';
 editorDiv.style.width = '100%';
 
-document.body.appendChild(editorDiv);
+//document.body.appendChild(editorDiv);
 
 const codeSample = `// プログラムオブジェクトを生成しシェーダをリンクする関数
 function create_program(vs, fs) {
@@ -21812,7 +21814,7 @@ const editor = new EditorView({
   state,
   parent: editorDiv,
 });
-
+/*
 undoDiv.addEventListener('click', () => {
   undo(editor);
 });
@@ -21852,7 +21854,7 @@ function logAreaSwipeMove(event) {
   event.preventDefault();
   endX = event.touches[0].pageX;
   const moveDistance = Math.round((endX - startX) / 8);
-  startX = endX;
+  startX = endX
   caret += moveDistance;
   const cursor = caret >= 0 ? caret : 0;
   logAreaDiv.textContent = `${cursor}: ${moveDistance}`;
@@ -21865,7 +21867,7 @@ function logAreaSwipeMove(event) {
 logAreaDiv.addEventListener(touchBegan, logAreaSwipeStart);
 
 logAreaDiv.addEventListener(touchMoved, logAreaSwipeMove);
-
+*/
 /*
 logAreaDiv.addEventListener(touchBegan, (e) => {
 //logAreaDiv.addEventListener('click', (e) => {
@@ -21890,3 +21892,5 @@ logAreaDiv.addEventListener(touchEnded, () => {
 });
 
 */
+
+export { EditorSelection, editor, editorDiv, redo, undo };
