@@ -31,114 +31,6 @@ logAreaDiv.style.border = '1px solid';
 // logAreaDiv.style.borderRadius = btnRadius;
 logAreaDiv.style.backgroundColor = '#bcbcbc';
 
-// const selectAllDiv = document.createElement('div');
-// selectAllDiv.id = 'selectAllWrap';
-// //selectAllDiv.textContent = '⎁';
-// selectAllDiv.textContent = 'A';
-// selectAllDiv.style.textAlign = 'center';
-// // selectAllDiv.textContent = 'select all';
-// selectAllDiv.style.width = btnW;
-// selectAllDiv.style.height = '100%';
-// selectAllDiv.style.border = '1px solid';
-// // selectAllDiv.style.borderRadius = btnRadius;
-// selectAllDiv.style.backgroundColor = '#ababab';
-
-/* select All
-const selectAllDiv = document.createElement('div');
-selectAllDiv.id = 'selectAllWrap';
-selectAllDiv.style.width = btnW;
-selectAllDiv.style.height = '100%';
-selectAllDiv.style.display = 'flex';
-selectAllDiv.style.justifyContent = 'center';
-selectAllDiv.style.alignItems = 'center';
-
-const selectAllButton = document.createElement('div');
-selectAllButton.id = 'redoBtn';
-selectAllButton.style.width = '90%';
-selectAllButton.style.height = '90%';
-selectAllButton.style.borderRadius = btnRadius;
-selectAllButton.style.backgroundColor = '#ababab';
-selectAllButton.style.display = 'flex';
-selectAllButton.style.justifyContent = 'center';
-selectAllButton.style.alignItems = 'center';
-
-const selectAllIcon = document.createElement('span');
-selectAllIcon.textContent = '⎁';
-
-selectAllIcon.style.fontWeight = 900;
-// selectAllIcon.style.transform = `rotate(${90}deg)`;
-selectAllButton.appendChild(selectAllIcon);
-selectAllDiv.appendChild(selectAllButton);
-*/
-
-/* redo --- 
-const redoDiv = document.createElement('div');
-redoDiv.id = 'redoWrap';
-redoDiv.style.width = btnW;
-redoDiv.style.height = '100%';
-redoDiv.style.display = 'flex';
-redoDiv.style.justifyContent = 'center';
-redoDiv.style.alignItems = 'center';
-
-const redoButton = document.createElement('div');
-redoButton.id = 'redoBtn';
-redoButton.style.width = '90%';
-redoButton.style.height = '90%';
-redoButton.style.borderRadius = btnRadius;
-redoButton.style.backgroundColor = '#ababab';
-redoButton.style.display = 'flex';
-redoButton.style.justifyContent = 'center';
-redoButton.style.alignItems = 'center';
-
-const redoIcon = document.createElement('span');
-redoIcon.textContent = '⤻';
-//redoIcon.style.transform = `rotate(${90}deg)`;
-redoButton.appendChild(redoIcon);
-redoDiv.appendChild(redoButton);
-*/
-
-/* undo ---
-const undoDiv = document.createElement('div');
-undoDiv.id = 'undoWrap';
-//undoDiv.textContent = 'undo';
-//undoDiv.textContent = '⎌';
-//undoDiv.textContent = 'U';
-// undoDiv.style.textAlign = 'center';
-undoDiv.style.width = btnW;
-undoDiv.style.height = '100%';
-// undoDiv.style.border = '1px solid';
-undoDiv.style.display = 'flex';
-undoDiv.style.justifyContent = 'center';
-undoDiv.style.alignItems = 'center';
-
-// undoDiv.style.borderRadius = btnRadius;
-//undoDiv.style.backgroundColor = '#ababab';
-
-const undoButton = document.createElement('div');
-undoButton.id = 'undoBtn';
-// undoButton.textContent = 'Un';
-undoButton.style.width = '90%';
-undoButton.style.height = '90%';
-undoButton.style.borderRadius = btnRadius;
-undoButton.style.backgroundColor = '#ababab';
-// undoButton.style.margin = '0 auto';
-// undoButton.style.padding = '1rem';
-undoButton.style.display = 'flex';
-undoButton.style.justifyContent = 'center';
-undoButton.style.alignItems = 'center';
-
-const undoIcon = document.createElement('span');
-undoIcon.textContent = '⤺';
-undoIcon.style.fontSize = '2rem';
-undoIcon.style.fontWeight = 900;
-undoIcon.style.color = '#fefefe';
-//undoIcon.style.transform = `rotate(${-90}deg)`;
-//undoIcon.style.display = 'inline-block'
-//undoIcon.style.verticalAlign = 'top'
-undoButton.appendChild(undoIcon);
-undoDiv.appendChild(undoButton);
-*/
-
 function _createButtonWrap(width, height) {
   const wrap = document.createElement('div');
   wrap.style.width = width;
@@ -169,10 +61,9 @@ function createActionButton(iconChar) {
   return wrap;
 }
 
-
-const selectAllButton = createActionButton('⎁')
-const redoButton = createActionButton('⤻')
-const undoButton = createActionButton('⤺')
+const selectAllButton = createActionButton('⎁');
+const redoButton = createActionButton('⤻');
+const undoButton = createActionButton('⤺');
 
 operationDiv.appendChild(logAreaDiv);
 operationDiv.appendChild(selectAllButton);
