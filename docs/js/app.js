@@ -232,8 +232,9 @@ function logAreaSwipeMove(event) {
   //startX = endX
   caret += moveDistance;
   logAreaDiv.textContent = `${caret}: ${moveDistance}`;
+  const cursor = caret >= 0 ? caret : 0;
   editor.dispatch({
-    selection: EditorSelection.create([EditorSelection.cursor(caret)]),
+    selection: EditorSelection.create([EditorSelection.cursor(cursor)]),
   });
   editor.focus();
 }
