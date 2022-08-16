@@ -229,7 +229,7 @@ function logAreaSwipeMove(event) {
   event.preventDefault();
   endX = event.touches[0].pageX;
   const moveDistance = Math.round((endX - startX) / 8);
-  //startX = endX
+  startX = endX
   caret += moveDistance;
   logAreaDiv.textContent = `${caret}: ${moveDistance}`;
   const cursor = caret >= 0 ? caret : 0;
