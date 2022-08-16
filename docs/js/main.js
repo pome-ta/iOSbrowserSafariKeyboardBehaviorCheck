@@ -43,7 +43,7 @@ logAreaDiv.style.backgroundColor = '#bcbcbc';
 // // selectAllDiv.style.borderRadius = btnRadius;
 // selectAllDiv.style.backgroundColor = '#ababab';
 
-/* select All --- */
+/* select All
 const selectAllDiv = document.createElement('div');
 selectAllDiv.id = 'selectAllWrap';
 selectAllDiv.style.width = btnW;
@@ -69,9 +69,9 @@ selectAllIcon.style.fontWeight = 900;
 // selectAllIcon.style.transform = `rotate(${90}deg)`;
 selectAllButton.appendChild(selectAllIcon);
 selectAllDiv.appendChild(selectAllButton);
-/* --- select All */
+*/
 
-/* redo --- */
+/* redo --- 
 const redoDiv = document.createElement('div');
 redoDiv.id = 'redoWrap';
 redoDiv.style.width = btnW;
@@ -95,9 +95,9 @@ redoIcon.textContent = '⤻';
 //redoIcon.style.transform = `rotate(${90}deg)`;
 redoButton.appendChild(redoIcon);
 redoDiv.appendChild(redoButton);
-/* --- redo */
+*/
 
-/* undo --- */
+/* undo ---
 const undoDiv = document.createElement('div');
 undoDiv.id = 'undoWrap';
 //undoDiv.textContent = 'undo';
@@ -137,7 +137,7 @@ undoIcon.style.color = '#fefefe';
 //undoIcon.style.verticalAlign = 'top'
 undoButton.appendChild(undoIcon);
 undoDiv.appendChild(undoButton);
-/* --- undo */
+*/
 
 function _createButtonWrap(width, height) {
   const wrap = document.createElement('div');
@@ -160,8 +160,8 @@ function createIcon(char) {
 
 function createActionButton(iconChar) {
   const icon = createIcon(iconChar);
-  const wrap = _createButtonWarap(btnW, '100%');
-  const button = _createButtonWarap('90%', '90%');
+  const wrap = _createButtonWrap(btnW, '100%');
+  const button = _createButtonWrap('90%', '90%');
   button.style.borderRadius = btnRadius;
   button.style.backgroundColor = '#ababab';
   button.appendChild(icon);
@@ -169,22 +169,27 @@ function createActionButton(iconChar) {
   return wrap;
 }
 
+
+const selectAllButton = createActionButton('⎁')
+const redoButton = createActionButton('⤻')
+const undoButton = createActionButton('⤺')
+
 operationDiv.appendChild(logAreaDiv);
-operationDiv.appendChild(selectAllDiv);
-operationDiv.appendChild(redoDiv);
-operationDiv.appendChild(undoDiv);
+operationDiv.appendChild(selectAllButton);
+operationDiv.appendChild(redoButton);
+operationDiv.appendChild(undoButton);
 
 document.body.appendChild(editorDiv);
 
-undoDiv.addEventListener('click', () => {
+undoButton.addEventListener('click', () => {
   undo(editor);
 });
 
-redoDiv.addEventListener('click', () => {
+redoButton.addEventListener('click', () => {
   redo(editor);
 });
 
-selectAllDiv.addEventListener('click', () => {
+selectAllButton.addEventListener('click', () => {
   const endRange = editor.state.doc.length;
   const transaction = {
     selection: EditorSelection.create([EditorSelection.range(0, endRange)]),
@@ -218,7 +223,7 @@ function logAreaSwipeMove(event) {
   // todo: mobile しか想定していないけども
   // xxx: ドラッグでの移動
   endX = event.touches ? event.touches[0].pageX : event.pageX;
-  const moveDistance = Math.round((endX - startX) / 16);
+  const moveDistance = Math.round((endX - startX) / 8);
   startX = endX;
   caret += moveDistance;
   const cursor = caret >= 0 ? caret : 0;
