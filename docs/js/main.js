@@ -28,7 +28,6 @@ logAreaDiv.textContent = 'log area & move caret';
 logAreaDiv.style.flexGrow = '1';
 logAreaDiv.style.height = '100%';
 logAreaDiv.style.border = '1px solid';
-// logAreaDiv.style.borderRadius = btnRadius;
 logAreaDiv.style.backgroundColor = '#bcbcbc';
 
 function _createButtonWrap(width, height) {
