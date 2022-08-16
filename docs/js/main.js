@@ -1,4 +1,10 @@
-import { editor, editorDiv, undo, redo, EditorSelection } from './app.bundle.js';
+import {
+  editor,
+  editorDiv,
+  undo,
+  redo,
+  EditorSelection,
+} from './app.bundle.js';
 
 document.body.style.backgroundColor = '#232323';
 
@@ -68,7 +74,6 @@ operationDiv.appendChild(undoDiv);
 
 document.body.appendChild(editorDiv);
 
-
 undoDiv.addEventListener('click', () => {
   undo(editor);
 });
@@ -107,8 +112,8 @@ function logAreaSwipeStart(event) {
 function logAreaSwipeMove(event) {
   event.preventDefault();
   endX = event.touches[0].pageX;
-  const moveDistance = Math.round((endX - startX) / 8);
-  startX = endX
+  const moveDistance = Math.round((endX - startX) / 16);
+  startX = endX;
   caret += moveDistance;
   const cursor = caret >= 0 ? caret : 0;
   logAreaDiv.textContent = `${cursor}: ${moveDistance}`;

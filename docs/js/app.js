@@ -190,9 +190,7 @@ const editor = new EditorView({
   parent: editorDiv,
 });
 
-
-
-export {editor, editorDiv, undo, redo, EditorSelection};
+export { editor, editorDiv, undo, redo, EditorSelection };
 /*
 undoDiv.addEventListener('click', () => {
   undo(editor);
