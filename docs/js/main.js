@@ -12,7 +12,6 @@ const operationDiv = document.createElement('div');
 operationDiv.id = 'operationWrap';
 operationDiv.style.width = '100%';
 operationDiv.style.height = '2.5rem';
-//operationDiv.style.height = '0px';
 operationDiv.style.backgroundColor = 'turquoise';
 operationDiv.style.display = 'flex';
 operationDiv.style.alignItems = 'center';
@@ -71,7 +70,11 @@ operationDiv.appendChild(selectAllButton);
 operationDiv.appendChild(redoButton);
 operationDiv.appendChild(undoButton);
 
+editorDiv.style.overflow = 'auto';
+/*
 //document.body.appendChild(editorDiv);
+//document.body.appendChild(operationDiv);
+*/
 
 const container = document.createElement('div');
 container.style.width = '100%';
@@ -89,26 +92,22 @@ container.appendChild(editorDiv);
 container.appendChild(operationDiv);
 operationDiv.style.display = 'none';
 
+
+
+
 visualViewport.addEventListener('resize', () => {
   if (visualViewport.height === window.innerHeight) {
     operationDiv.style.display = 'none';
   } else {
     operationDiv.style.display = 'flex';
-    
   }
   //console.log(visualViewport.height)
   container.style.height = `${visualViewport.height}px`;
-  //editorDiv.style.height = `${container.style.height - operationDiv.style.height}px`
+  editorDiv.style.height = `${container.offsetHeight - operationDiv.offsetHeight}px`
   
-  //container.style.height = `${visualViewport.height}px`;
-
-  //  if (window.innerHeight === visualViewport.height) {
-  //    container.style.height = '100%';
-  //  } else {
-  //    container.style.height = `${visualViewport.height}px`;
-  //  }
-  //console.log(window.innerHeight)
-  //console.log(visualViewport.height)
+  //console.log(editorDiv.style.height)
+  //console.log(operationDiv.offsetHeight)
+  
 });
 
 undoButton.addEventListener('click', () => {
