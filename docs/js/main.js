@@ -12,12 +12,12 @@ const operationDiv = document.createElement('div');
 operationDiv.id = 'operationWrap';
 operationDiv.style.width = '100%';
 operationDiv.style.height = '2.5rem';
-//operationDiv.style.padding = '0.25rem';
+
 operationDiv.style.backgroundColor = 'turquoise';
 operationDiv.style.display = 'flex';
 operationDiv.style.alignItems = 'center';
 
-document.body.appendChild(operationDiv);
+//document.body.appendChild(operationDiv);
 
 const btnW = '2rem';
 const btnRadius = '16%';
@@ -27,7 +27,7 @@ logAreaDiv.id = 'logAreaWrap';
 logAreaDiv.textContent = 'log area & move caret';
 logAreaDiv.style.flexGrow = '1';
 logAreaDiv.style.height = '100%';
-logAreaDiv.style.border = '1px solid';
+//logAreaDiv.style.border = '1px solid';
 logAreaDiv.style.backgroundColor = '#bcbcbc';
 
 function _createButtonWrap(width, height) {
@@ -43,8 +43,8 @@ function _createButtonWrap(width, height) {
 function createIcon(char) {
   const icon = document.createElement('span');
   icon.textContent = char;
-  icon.style.fontSize = '2rem';
-  icon.style.fontWeight = 900;
+  icon.style.fontSize = '1.2rem';
+  //icon.style.fontWeight = 900;
   icon.style.color = '#fefefe';
   return icon;
 }
@@ -69,7 +69,43 @@ operationDiv.appendChild(selectAllButton);
 operationDiv.appendChild(redoButton);
 operationDiv.appendChild(undoButton);
 
-document.body.appendChild(editorDiv);
+//document.body.appendChild(editorDiv);
+
+const container = document.createElement('div');
+container.style.width = '100%';
+container.style.height = '100%';
+container.style.display = 'grid';
+
+//container.style.gridTemplateColumns = ''
+container.style.gridTemplateRows = '1fr auto';
+
+//editorDiv.style.height = '100%';
+editorDiv.style.overflow = 'auto';
+document.body.appendChild(container);
+container.appendChild(editorDiv);
+container.appendChild(operationDiv);
+operationDiv.style.display = 'none';
+
+visualViewport.addEventListener('resize', () => {
+  if (visualViewport.height === window.innerHeight) {
+    operationDiv.style.display = 'none';
+  } else {
+    operationDiv.style.display = 'flex';
+    
+  }
+  container.style.height = `${visualViewport.height}px`;
+  editorDiv.style.height = `${container.style.height - operationDiv.style.height}px`
+  
+  //container.style.height = `${visualViewport.height}px`;
+
+  //  if (window.innerHeight === visualViewport.height) {
+  //    container.style.height = '100%';
+  //  } else {
+  //    container.style.height = `${visualViewport.height}px`;
+  //  }
+  //console.log(window.innerHeight)
+  //console.log(visualViewport.height)
+});
 
 undoButton.addEventListener('click', () => {
   undo(editor);

@@ -21687,6 +21687,63 @@ function create_program(vs, fs) {
     return null;
   }
 }
+function create_program(vs, fs) {
+  // プログラムオブジェクトの生成
+  const program = gl.createProgram();
+  // プログラムオブジェクトにシェーダを割り当てる
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  // シェーダをリンク
+  gl.linkProgram(program);
+  // シェーダのリンクが正しく行なわれたかチェック
+  if (gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    // 成功していたらプログラムオブジェクトを有効にする
+    gl.useProgram(program);
+    // プログラムオブジェクトを返して終了
+    return program;
+  } else {
+    // 失敗していたら NULL を返す
+    return null;
+  }
+}
+function create_program(vs, fs) {
+  // プログラムオブジェクトの生成
+  const program = gl.createProgram();
+  // プログラムオブジェクトにシェーダを割り当てる
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  // シェーダをリンク
+  gl.linkProgram(program);
+  // シェーダのリンクが正しく行なわれたかチェック
+  if (gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    // 成功していたらプログラムオブジェクトを有効にする
+    gl.useProgram(program);
+    // プログラムオブジェクトを返して終了
+    return program;
+  } else {
+    // 失敗していたら NULL を返す
+    return null;
+  }
+}
+function create_program(vs, fs) {
+  // プログラムオブジェクトの生成
+  const program = gl.createProgram();
+  // プログラムオブジェクトにシェーダを割り当てる
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  // シェーダをリンク
+  gl.linkProgram(program);
+  // シェーダのリンクが正しく行なわれたかチェック
+  if (gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    // 成功していたらプログラムオブジェクトを有効にする
+    gl.useProgram(program);
+    // プログラムオブジェクトを返して終了
+    return program;
+  } else {
+    // 失敗していたら NULL を返す
+    return null;
+  }
+}
 `;
 
 const tabSize = new Compartment();
@@ -21715,6 +21772,13 @@ EditorView.theme({
   '.cm-line *': { backgroundColor: darkBackground },
 });
 
+const overflowView = EditorView.theme({
+   '&': { maxHeight: `${visualViewport.height}` },
+  '.cm-gutter,.cm-content': { minHeight: `${visualViewport.height}` },
+  '.cm-scroller': { overflow: 'auto' },
+});
+
+
 const state = EditorState.create({
   doc: codeSample,
   extensions: [
@@ -21740,6 +21804,7 @@ const state = EditorState.create({
     // indentationMarkers(),
     // backgroundOpacity,
     whitespaceShow,
+    overflowView,
   ],
 });
 
