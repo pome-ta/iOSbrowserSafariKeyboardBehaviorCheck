@@ -109,10 +109,12 @@ visualViewport.addEventListener('resize', () => {
 
 undoButton.addEventListener('click', () => {
   undo(editor);
+  editor.focus();
 });
 
 redoButton.addEventListener('click', () => {
   redo(editor);
+  editor.focus();
 });
 
 selectAllButton.addEventListener('click', () => {
