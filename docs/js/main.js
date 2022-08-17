@@ -12,7 +12,7 @@ const operationDiv = document.createElement('div');
 operationDiv.id = 'operationWrap';
 operationDiv.style.width = '100%';
 operationDiv.style.height = '2.5rem';
-
+//operationDiv.style.height = '0px';
 operationDiv.style.backgroundColor = 'turquoise';
 operationDiv.style.display = 'flex';
 operationDiv.style.alignItems = 'center';
@@ -23,12 +23,14 @@ const btnW = '2rem';
 const btnRadius = '16%';
 
 const logAreaDiv = document.createElement('div');
+const logSpan = document.createElement('span');
+logSpan.textContent = 'log area & move caret';
 logAreaDiv.id = 'logAreaWrap';
-logAreaDiv.textContent = 'log area & move caret';
 logAreaDiv.style.flexGrow = '1';
 logAreaDiv.style.height = '100%';
 //logAreaDiv.style.border = '1px solid';
 logAreaDiv.style.backgroundColor = '#bcbcbc';
+logAreaDiv.appendChild(logSpan)
 
 function _createButtonWrap(width, height) {
   const wrap = document.createElement('div');
@@ -73,13 +75,14 @@ operationDiv.appendChild(undoButton);
 
 const container = document.createElement('div');
 container.style.width = '100%';
-container.style.height = '100%';
+//container.style.height = '100%';
+container.style.height = `${visualViewport.height}px`;
 container.style.display = 'grid';
 
 //container.style.gridTemplateColumns = ''
 container.style.gridTemplateRows = '1fr auto';
 
-//editorDiv.style.height = '100%';
+editorDiv.style.height = '100%';
 editorDiv.style.overflow = 'auto';
 document.body.appendChild(container);
 container.appendChild(editorDiv);
@@ -93,8 +96,9 @@ visualViewport.addEventListener('resize', () => {
     operationDiv.style.display = 'flex';
     
   }
+  //console.log(visualViewport.height)
   container.style.height = `${visualViewport.height}px`;
-  editorDiv.style.height = `${container.style.height - operationDiv.style.height}px`
+  //editorDiv.style.height = `${container.style.height - operationDiv.style.height}px`
   
   //container.style.height = `${visualViewport.height}px`;
 
@@ -155,7 +159,7 @@ function logAreaSwipeMove(event) {
   startX = endX;
   caret += moveDistance;
   const cursor = caret >= 0 ? caret : 0;
-  logAreaDiv.textContent = `${cursor}: ${moveDistance}`;
+  logSpan.textContent = `${cursor}: ${moveDistance}`;
   editor.dispatch({
     selection: EditorSelection.create([EditorSelection.cursor(cursor)]),
   });
