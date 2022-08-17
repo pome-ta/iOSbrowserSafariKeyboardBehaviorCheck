@@ -78,32 +78,58 @@ editorDiv.style.overflow = 'auto';
 
 const container = document.createElement('div');
 container.style.width = '100%';
-//container.style.height = '100%';
-container.style.height = `${visualViewport.height}px`;
+container.style.height = '100%';
+
+//container.style.height = `${visualViewport.height}px`;
+
 container.style.display = 'grid';
 
 //container.style.gridTemplateColumns = ''
 container.style.gridTemplateRows = '1fr auto';
 
 editorDiv.style.height = '100%';
+
 editorDiv.style.overflow = 'auto';
 document.body.appendChild(container);
 container.appendChild(editorDiv);
 container.appendChild(operationDiv);
-operationDiv.style.display = 'none';
 
+//operationDiv.style.display = 'none';
+operationDiv.style.position = 'fixed'
+operationDiv.style.zIndex = 1;
+operationDiv.style.bottom = 0;
 
 
 
 visualViewport.addEventListener('resize', () => {
   if (visualViewport.height === window.innerHeight) {
     operationDiv.style.display = 'none';
+    document.body.style.backgroundColor = 'yellow';
   } else {
     operationDiv.style.display = 'flex';
+    document.body.style.backgroundColor = 'blue';
+    
   }
+  
+  //container.style.top = visualViewport.offsetTop.toString() + 'px'
   //console.log(visualViewport.height)
-  container.style.height = `${visualViewport.height}px`;
-  editorDiv.style.height = `${container.offsetHeight - operationDiv.offsetHeight}px`
+  //container.style.height = `${visualViewport.height}px`;
+  //editorDiv.style.height = `${container.offsetHeight - operationDiv.offsetHeight}px`
+  
+  const upBottom = window.innerHeight - visualViewport.height + visualViewport.offsetTop;
+  
+  
+  
+  operationDiv.style.bottom = `${upBottom}px`;
+  
+  
+  console.log('---')
+  console.log(upBottom)
+  console.log('off')
+  console.log(visualViewport.offsetTop)
+  console.log('height')
+  console.log(visualViewport.height)
+  console.log(window.innerHeight)
   
   //console.log(editorDiv.style.height)
   //console.log(operationDiv.offsetHeight)
