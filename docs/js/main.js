@@ -100,12 +100,20 @@ operationDiv.style.zIndex = 1;
 operationDiv.style.bottom = 0;
 
 function visualViewportHandler() {
+  /*
   if (visualViewport.height === window.innerHeight) {
     operationDiv.style.display = 'none';
     document.body.style.backgroundColor = 'yellow';
   } else {
     operationDiv.style.display = 'flex';
     document.body.style.backgroundColor = 'blue';
+  }*/
+  if (editor.hasFocus) {
+    operationDiv.style.display = 'flex';
+    document.body.style.backgroundColor = 'blue';
+  } else {
+    operationDiv.style.display = 'none';
+    document.body.style.backgroundColor = 'yellow';
   }
 
   const upBottom =
@@ -116,9 +124,7 @@ function visualViewportHandler() {
 
   operationDiv.style.bottom = `${upBottom}px`;
 
-  editorDiv.style.height = `${
-    container.offsetHeight - operationDiv.offsetHeight * 2
-  }px`;
+  editorDiv.style.height = `${container.offsetHeight - operationDiv.offsetHeight}px`;
   //editorDiv.style.top = `-${visualViewport.pageTop}px`
   //editorDiv.style.top = `-${operationDiv.offsetHeight}px`
   /*
