@@ -11,8 +11,8 @@ import {
 const operationDiv = document.createElement('div');
 operationDiv.id = 'operationWrap';
 operationDiv.style.width = '100%';
-operationDiv.style.height = '2.5rem';
-operationDiv.style.padding = '0 0.2rem';
+operationDiv.style.height = '3rem';
+operationDiv.style.padding = '0.2rem';
 operationDiv.style.backgroundColor = '#1c1c1e80'; // Gray6
 // operationDiv.style.backgroundColor = '#1c1c1e'; // Gray6
 operationDiv.style.display = 'flex';
@@ -93,7 +93,7 @@ document.body.appendChild(container);
 container.appendChild(editorDiv);
 container.appendChild(operationDiv);
 
-// operationDiv.style.display = 'none';
+operationDiv.style.display = 'none';
 // operationDiv.style.position = 'fixed';
 operationDiv.style.position = 'sticky';
 operationDiv.style.zIndex = 1;
@@ -101,10 +101,10 @@ operationDiv.style.bottom = 0;
 
 function visualViewportHandler() {
   if (editor.hasFocus) {
-    // operationDiv.style.display = 'flex';
+    operationDiv.style.display = 'flex';
     document.body.style.backgroundColor = 'blue';
   } else {
-    // operationDiv.style.display = 'none';
+    operationDiv.style.display = 'none';
     document.body.style.backgroundColor = 'yellow';
   }
 
