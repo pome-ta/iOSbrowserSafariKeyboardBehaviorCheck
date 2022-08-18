@@ -99,7 +99,21 @@ operationDiv.style.position = 'fixed'
 operationDiv.style.zIndex = 1;
 operationDiv.style.bottom = 0;
 
-
+visualViewport.addEventListener('scroll', () => {
+if (visualViewport.height === window.innerHeight) {
+    operationDiv.style.display = 'none';
+    document.body.style.backgroundColor = 'yellow';
+  } else {
+    operationDiv.style.display = 'flex';
+    document.body.style.backgroundColor = 'blue';
+    
+  }
+  const upBottom = window.innerHeight - visualViewport.height + visualViewport.offsetTop - visualViewport.pageTop;
+  
+  operationDiv.style.bottom = `${upBottom}px`;
+  //editorDiv.style.height = `${container.offsetHeight - operationDiv.offsetHeight + visualViewport.pageTop}px`
+  
+})
 
 visualViewport.addEventListener('resize', () => {
   if (visualViewport.height === window.innerHeight) {
@@ -114,15 +128,16 @@ visualViewport.addEventListener('resize', () => {
   //container.style.top = visualViewport.offsetTop.toString() + 'px'
   //console.log(visualViewport.height)
   //container.style.height = `${visualViewport.height}px`;
-  //editorDiv.style.height = `${container.offsetHeight - operationDiv.offsetHeight}px`
+  editorDiv.style.height = `${container.offsetHeight - operationDiv.offsetHeight}px`
   
   const upBottom = window.innerHeight - visualViewport.height + visualViewport.offsetTop;
   
-  
+  //operationDiv.style.bottom += '10px';
   
   operationDiv.style.bottom = `${upBottom}px`;
-  
-  
+  //console.log(visualViewport.offsetTop)
+  //console.log(visualViewport.pageTop)
+  /*
   console.log('---')
   console.log(upBottom)
   console.log('off')
@@ -130,7 +145,7 @@ visualViewport.addEventListener('resize', () => {
   console.log('height')
   console.log(visualViewport.height)
   console.log(window.innerHeight)
-  
+  */
   //console.log(editorDiv.style.height)
   //console.log(operationDiv.offsetHeight)
   
