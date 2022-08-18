@@ -94,7 +94,7 @@ document.body.appendChild(container);
 container.appendChild(editorDiv);
 container.appendChild(operationDiv);
 
-//operationDiv.style.display = 'none';
+operationDiv.style.display = 'none';
 operationDiv.style.position = 'fixed'
 operationDiv.style.zIndex = 1;
 operationDiv.style.bottom = 0;
