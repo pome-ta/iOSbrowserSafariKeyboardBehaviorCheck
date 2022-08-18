@@ -21793,7 +21793,7 @@ EditorView.theme({
   '.cm-line *': { backgroundColor: darkBackground },
 });
 
-EditorView.theme({
+const overflowView = EditorView.theme({
    '&': { maxHeight: `${visualViewport.height}` },
   '.cm-gutter,.cm-content': { minHeight: `${visualViewport.height}` },
   '.cm-scroller': { overflow: 'auto' },
@@ -21825,7 +21825,7 @@ const state = EditorState.create({
     // indentationMarkers(),
     // backgroundOpacity,
     whitespaceShow,
-    //overflowView,
+    overflowView,
   ],
 });
 

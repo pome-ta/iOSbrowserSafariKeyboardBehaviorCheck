@@ -201,7 +201,7 @@ const state = EditorState.create({
     // indentationMarkers(),
     // backgroundOpacity,
     whitespaceShow,
-    //overflowView,
+    overflowView,
   ],
 });
 
