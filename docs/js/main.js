@@ -16,8 +16,6 @@ operationDiv.style.backgroundColor = 'turquoise';
 operationDiv.style.display = 'flex';
 operationDiv.style.alignItems = 'center';
 
-
-
 const btnW = '2rem';
 const btnRadius = '16%';
 
@@ -88,14 +86,6 @@ operationDiv.style.zIndex = 1;
 operationDiv.style.bottom = 0;
 
 function visualViewportHandler() {
-  /*
-  if (visualViewport.height === window.innerHeight) {
-    operationDiv.style.display = 'none';
-    document.body.style.backgroundColor = 'yellow';
-  } else {
-    operationDiv.style.display = 'flex';
-    document.body.style.backgroundColor = 'blue';
-  }*/
   if (editor.hasFocus) {
     operationDiv.style.display = 'flex';
     document.body.style.backgroundColor = 'blue';
@@ -110,61 +100,14 @@ function visualViewportHandler() {
     visualViewport.offsetTop -
     visualViewport.pageTop;
 
-  operationDiv.style.bottom = `${upBottom}px`;
+  const editorDivHeight = container.offsetHeight - operationDiv.offsetHeight;
 
-  editorDiv.style.height = `${container.offsetHeight - operationDiv.offsetHeight}px`;
-  //editorDiv.style.top = `-${visualViewport.pageTop}px`
-  //editorDiv.style.top = `-${operationDiv.offsetHeight}px`
-  /*
-  console.log('--- --- ---')
-  console.log('off')
-  console.log(visualViewport.offsetTop)
-  console.log('page')
-  console.log(visualViewport.pageTop)
-  console.log('height')
-  console.log(visualViewport.height)
-  console.log(window.innerHeight)
-  */
+  operationDiv.style.bottom = `${upBottom}px`;
+  editorDiv.style.height = `${editorDivHeight}px`;
 }
 
 visualViewport.addEventListener('scroll', visualViewportHandler);
 visualViewport.addEventListener('resize', visualViewportHandler);
-/*
-visualViewport.addEventListener('resize', () => {
-  if (visualViewport.height === window.innerHeight) {
-    operationDiv.style.display = 'none';
-    document.body.style.backgroundColor = 'yellow';
-  } else {
-    operationDiv.style.display = 'flex';
-    document.body.style.backgroundColor = 'blue';
-    
-  }
-  
-  //container.style.top = visualViewport.offsetTop.toString() + 'px'
-  //console.log(visualViewport.height)
-  //container.style.height = `${visualViewport.height}px`;
-  editorDiv.style.height = `${container.offsetHeight - operationDiv.offsetHeight}px`
-  
-  const upBottom = window.innerHeight - visualViewport.height + visualViewport.offsetTop;
-  
-  //operationDiv.style.bottom += '10px';
-  
-  operationDiv.style.bottom = `${upBottom}px`;
-  //console.log(visualViewport.offsetTop)
-  //console.log(visualViewport.pageTop)
-  
-  console.log('---')
-  console.log(upBottom)
-  console.log('off')
-  console.log(visualViewport.offsetTop)
-  console.log('height')
-  console.log(visualViewport.height)
-  console.log(window.innerHeight)
-  
-  //console.log(editorDiv.style.height)
-  //console.log(operationDiv.offsetHeight)
-  
-});*/
 
 undoButton.addEventListener('click', () => {
   undo(editor);
