@@ -99,22 +99,37 @@ operationDiv.style.position = 'fixed'
 operationDiv.style.zIndex = 1;
 operationDiv.style.bottom = 0;
 
-visualViewport.addEventListener('scroll', () => {
+
+function visualViewportHandler() {
 if (visualViewport.height === window.innerHeight) {
     operationDiv.style.display = 'none';
     document.body.style.backgroundColor = 'yellow';
   } else {
     operationDiv.style.display = 'flex';
     document.body.style.backgroundColor = 'blue';
-    
   }
+  
   const upBottom = window.innerHeight - visualViewport.height + visualViewport.offsetTop - visualViewport.pageTop;
   
   operationDiv.style.bottom = `${upBottom}px`;
-  //editorDiv.style.height = `${container.offsetHeight - operationDiv.offsetHeight + visualViewport.pageTop}px`
   
-})
+  editorDiv.style.height = `${container.offsetHeight - operationDiv.offsetHeight}px`
+  
+  console.log('--- --- ---')
+  console.log('off')
+  console.log(visualViewport.offsetTop)
+  console.log('page')
+  console.log(visualViewport.pageTop)
+  console.log('height')
+  console.log(visualViewport.height)
+  console.log(window.innerHeight)
+  
+  
+}
 
+visualViewport.addEventListener('scroll', visualViewportHandler)
+visualViewport.addEventListener('resize', visualViewportHandler)
+/*
 visualViewport.addEventListener('resize', () => {
   if (visualViewport.height === window.innerHeight) {
     operationDiv.style.display = 'none';
@@ -137,7 +152,7 @@ visualViewport.addEventListener('resize', () => {
   operationDiv.style.bottom = `${upBottom}px`;
   //console.log(visualViewport.offsetTop)
   //console.log(visualViewport.pageTop)
-  /*
+  
   console.log('---')
   console.log(upBottom)
   console.log('off')
@@ -145,11 +160,11 @@ visualViewport.addEventListener('resize', () => {
   console.log('height')
   console.log(visualViewport.height)
   console.log(window.innerHeight)
-  */
+  
   //console.log(editorDiv.style.height)
   //console.log(operationDiv.offsetHeight)
   
-});
+});*/
 
 undoButton.addEventListener('click', () => {
   undo(editor);
