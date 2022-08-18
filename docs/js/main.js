@@ -113,8 +113,8 @@ if (visualViewport.height === window.innerHeight) {
   
   operationDiv.style.bottom = `${upBottom}px`;
   
-  editorDiv.style.height = `${container.offsetHeight - operationDiv.offsetHeight}px`
-  
+  editorDiv.style.height = `${container.offsetHeight - (operationDiv.offsetHeight * 2)}px`
+  /*
   console.log('--- --- ---')
   console.log('off')
   console.log(visualViewport.offsetTop)
@@ -123,7 +123,7 @@ if (visualViewport.height === window.innerHeight) {
   console.log('height')
   console.log(visualViewport.height)
   console.log(window.innerHeight)
-  
+  */
   
 }
 
