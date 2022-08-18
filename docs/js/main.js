@@ -16,7 +16,7 @@ operationDiv.style.backgroundColor = 'turquoise';
 operationDiv.style.display = 'flex';
 operationDiv.style.alignItems = 'center';
 
-//document.body.appendChild(operationDiv);
+
 
 const btnW = '2rem';
 const btnRadius = '16%';
@@ -27,7 +27,6 @@ logSpan.textContent = 'log area & move caret';
 logAreaDiv.id = 'logAreaWrap';
 logAreaDiv.style.flexGrow = '1';
 logAreaDiv.style.height = '100%';
-//logAreaDiv.style.border = '1px solid';
 logAreaDiv.style.backgroundColor = '#bcbcbc';
 logAreaDiv.appendChild(logSpan);
 
@@ -70,26 +69,15 @@ operationDiv.appendChild(selectAllButton);
 operationDiv.appendChild(redoButton);
 operationDiv.appendChild(undoButton);
 
-editorDiv.style.overflow = 'auto';
-/*
-//document.body.appendChild(editorDiv);
-//document.body.appendChild(operationDiv);
-*/
-
 const container = document.createElement('div');
 container.style.width = '100%';
 container.style.height = '100%';
-
-//container.style.height = `${visualViewport.height}px`;
-
 container.style.display = 'grid';
-
-//container.style.gridTemplateColumns = ''
 container.style.gridTemplateRows = '1fr auto';
 
 editorDiv.style.height = '100%';
+editorDiv.style.overflow = 'auto';
 
-//editorDiv.style.overflow = 'auto';
 document.body.appendChild(container);
 container.appendChild(editorDiv);
 container.appendChild(operationDiv);
