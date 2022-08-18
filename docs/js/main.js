@@ -7,12 +7,14 @@ import {
 } from './app.bundle.js';
 
 // document.body.style.backgroundColor = '#232323';
-
+// document.body.style.backgroundColor = 'red';
 const operationDiv = document.createElement('div');
 operationDiv.id = 'operationWrap';
 operationDiv.style.width = '100%';
 operationDiv.style.height = '2.5rem';
-operationDiv.style.backgroundColor = 'turquoise';
+operationDiv.style.padding = '0 0.2rem';
+operationDiv.style.backgroundColor = '#1c1c1e80'; // Gray6
+// operationDiv.style.backgroundColor = '#1c1c1e'; // Gray6
 operationDiv.style.display = 'flex';
 operationDiv.style.alignItems = 'center';
 
@@ -20,13 +22,21 @@ const btnW = '2rem';
 const btnRadius = '16%';
 
 const logAreaDiv = document.createElement('div');
-const logSpan = document.createElement('span');
-logSpan.textContent = 'log area & move caret';
+logAreaDiv.style.padding = '0.2rem';
+// const logSpan = document.createElement('span');
+const logParagraph = document.createElement('p');
+logParagraph.textContent = 'log area & move caret';
+logParagraph.style.height = '100%';
+logParagraph.style.margin = 0;
+logParagraph.style.fontSize = '0.8rem';
+// logParagraph.style.backgroundColor = 'red';
+logParagraph.style.backgroundColor = '#8e8e9380';
+logParagraph.style.color = '#d1d1d6'; // light Gray4
 logAreaDiv.id = 'logAreaWrap';
 logAreaDiv.style.flexGrow = '1';
 logAreaDiv.style.height = '100%';
-logAreaDiv.style.backgroundColor = '#bcbcbc';
-logAreaDiv.appendChild(logSpan);
+// logAreaDiv.style.backgroundColor = '#bcbcbc';
+logAreaDiv.appendChild(logParagraph);
 
 function _createButtonWrap(width, height) {
   const wrap = document.createElement('div');
@@ -43,18 +53,21 @@ function createIcon(char) {
   icon.textContent = char;
   icon.style.fontSize = '1.2rem';
   //icon.style.fontWeight = 900;
-  icon.style.color = '#fefefe';
+  // icon.style.color = '#fefefe';
+  icon.style.color = '#f2f2f7'; // gray6
   return icon;
 }
 
 function createActionButton(iconChar) {
-  const icon = createIcon(iconChar);
   const wrap = _createButtonWrap(btnW, '100%');
   const button = _createButtonWrap('90%', '90%');
-  button.style.borderRadius = btnRadius;
-  button.style.backgroundColor = '#ababab';
-  button.appendChild(icon);
+  const icon = createIcon(iconChar);
   wrap.appendChild(button);
+  wrap.style.cursor = 'pointer';
+  button.style.borderRadius = btnRadius;
+  // button.style.backgroundColor = '#ababab';
+  button.style.backgroundColor = '#8e8e93'; // light gray
+  button.appendChild(icon);
   return wrap;
 }
 
@@ -80,17 +93,18 @@ document.body.appendChild(container);
 container.appendChild(editorDiv);
 container.appendChild(operationDiv);
 
-operationDiv.style.display = 'none';
-operationDiv.style.position = 'fixed';
+// operationDiv.style.display = 'none';
+// operationDiv.style.position = 'fixed';
+operationDiv.style.position = 'sticky';
 operationDiv.style.zIndex = 1;
 operationDiv.style.bottom = 0;
 
 function visualViewportHandler() {
   if (editor.hasFocus) {
-    operationDiv.style.display = 'flex';
+    // operationDiv.style.display = 'flex';
     document.body.style.backgroundColor = 'blue';
   } else {
-    operationDiv.style.display = 'none';
+    // operationDiv.style.display = 'none';
     document.body.style.backgroundColor = 'yellow';
   }
 
@@ -157,8 +171,7 @@ function logAreaSwipeMove(event) {
   startX = endX;
   caret += moveDistance;
   const cursor = caret >= 0 ? caret : 0;
-  //logSpan.textContent = `${editor.hasFocus}`//`${cursor}: ${moveDistance}`;
-  logSpan.textContent = `${cursor}: ${moveDistance}`;
+  logParagraph.textContent = `${cursor}: ${moveDistance}`;
   editor.dispatch({
     selection: EditorSelection.create([EditorSelection.cursor(cursor)]),
   });

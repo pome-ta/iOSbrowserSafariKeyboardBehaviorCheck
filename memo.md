@@ -1,8 +1,18 @@
+# 📝 2022/08/18
+
+## codemirror 側の高さ設定
+
+[variable height editor that scrolls - discuss.CodeMirror](https://discuss.codemirror.net/t/variable-height-editor-that-scrolls/4024/2)
+
+色々と調整することあるかも
+
+## 色味
+
+[Color - Foundations - Human Interface Guidelines - Design - Apple Developer](https://developer.apple.com/design/human-interface-guidelines/foundations/color/#dynamic-system-colors:~:text=System%20gray%20colors%20(iOS))
+
 # 📝 2022/08/16
 
-
 `event.touches[0].pageX` スマホしか取れないか、ハンドリングせんと
-
 
 # 📝 2022/08/14
 

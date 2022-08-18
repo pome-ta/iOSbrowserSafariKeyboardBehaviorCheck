@@ -21794,9 +21794,13 @@ EditorView.theme({
 });
 
 const overflowView = EditorView.theme({
-  '&': { maxHeight: `${visualViewport.height}` },
+  '&': { maxHeight: `${visualViewport.height}`, fontSize: '0.8rem' },
   '.cm-gutter,.cm-content': { minHeight: `${visualViewport.height}` },
-  '.cm-scroller': { overflow: 'auto' },
+  '.cm-scroller': {
+    overflow: 'auto',
+    fontFamily:
+      'Consolas, Menlo, Monaco, source-code-pro, Courier New, monospace',
+  },
 });
 
 const state = EditorState.create({
