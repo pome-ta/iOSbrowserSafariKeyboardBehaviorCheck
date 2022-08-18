@@ -89,7 +89,7 @@ container.style.gridTemplateRows = '1fr auto';
 
 editorDiv.style.height = '100%';
 
-editorDiv.style.overflow = 'auto';
+//editorDiv.style.overflow = 'auto';
 document.body.appendChild(container);
 container.appendChild(editorDiv);
 container.appendChild(operationDiv);
@@ -119,6 +119,8 @@ function visualViewportHandler() {
   editorDiv.style.height = `${
     container.offsetHeight - operationDiv.offsetHeight * 2
   }px`;
+  //editorDiv.style.top = `-${visualViewport.pageTop}px`
+  //editorDiv.style.top = `-${operationDiv.offsetHeight}px`
   /*
   console.log('--- --- ---')
   console.log('off')
@@ -218,6 +220,7 @@ function logAreaSwipeMove(event) {
   startX = endX;
   caret += moveDistance;
   const cursor = caret >= 0 ? caret : 0;
+  //logSpan.textContent = `${editor.hasFocus}`//`${cursor}: ${moveDistance}`;
   logSpan.textContent = `${cursor}: ${moveDistance}`;
   editor.dispatch({
     selection: EditorSelection.create([EditorSelection.cursor(cursor)]),
