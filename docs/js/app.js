@@ -24,7 +24,6 @@ import { javascript } from '@codemirror/lang-javascript';
 
 import { oneDark } from '@codemirror/theme-one-dark';
 import { myOneDark } from './theme-my-oneDark.js';
-
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 
 const editorDiv = document.createElement('div');
@@ -195,7 +194,6 @@ const state = EditorState.create({
     autocompletion(),
     keymap.of([...closeBracketsKeymap, ...completionKeymap, indentWithTab]),
     /* --- basicSetup */
-    //
     tabSize.of(EditorState.tabSize.of(2)),
     EditorView.lineWrapping, // 改行
     javascript(),
